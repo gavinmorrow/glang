@@ -1,0 +1,67 @@
+DISCLAIMER: this could be totally wrong, idk. this is mostly just for me when
+            I'm writing the code.
+
+program        -> statement*
+
+statement      -> "let" binding ";"
+                | expression ";"
+
+binding        -> pattern "=" expression
+
+expression     -> block
+                | call
+                | if_expr
+                | binary_op
+                | unary_op
+                | primary
+
+block          -> "{" statement* "}"
+
+call           -> primary arguments?
+arguments      -> expression*
+
+if_expr        -> "if" expression block ( "else" (if_expr | block) )?
+
+binary_op      -> binary_op op binary_op
+                | expression
+op             -> "or"
+                | "and"
+                | "!=" | "=="
+                | ">" | ">=" | "<" | "<="
+                | "-" | "+"
+                | "/" | "*"
+
+primary        -> "true"
+                | "false"
+                | NUMBER
+                | STRING
+                | IDENTIFIER
+                | "(" expression ")"
+
+NUMBER         -> DIGIT+ ( "." DIGIT+ )?
+STRING         -> "\"" <any non-"\"" character>* "\""
+IDENTIFIER     -> ALPHA ( ALPHA | DIGIT )*
+ALPHA          -> "a" ... "z" | "A" ... "Z" | "_"
+DIGIT          -> "0" ... "9"
+
+
+example program: ```
+let answer = random(0, 10);
+let ask_until_correct acc_times = {
+    let guess = input("> ");
+    let acc_times = acc_times + 1;
+    if guess == answer {
+        acc_times
+    } else {
+        ask_until_correct acc_times
+    }
+};
+let guesses_used = ask_until_correct 0;
+print (if guesses_used < 5 {
+    "Woah, you're lucky!"
+} else if guesses_used <= 10 {
+    "Not too bad."
+} else {
+    "How???"
+});
+```
