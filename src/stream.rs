@@ -1,11 +1,14 @@
 pub struct Stream<T> {
     data: Vec<T>,
-    pointer: usize,
+    pointer_to_next: usize,
 }
 
 impl<T> Stream<T> {
     pub fn new(data: Vec<T>) -> Self {
-        Stream { data, pointer: 0 }
+        Stream {
+            data,
+            pointer_to_next: 0,
+        }
     }
 }
 
@@ -13,8 +16,8 @@ impl<T: Clone> Iterator for Stream<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let item = self.data.get(self.pointer).cloned();
-        self.pointer += 1;
+        let item = self.data.get(self.pointer_to_next).cloned();
+        self.pointer_to_next += 1;
         item
     }
 }
@@ -34,7 +37,8 @@ impl<T: Clone> Stream<T> {
         let mut items = vec![];
         while let Some(next) = self.peek() {
             if f(next) {
-                items.push(self.next().expect("iterator has next item"));
+                let value = self.next().expect("iterator has next item");
+                items.push(value);
             } else {
                 break;
             }
@@ -45,21 +49,26 @@ impl<T: Clone> Stream<T> {
 
 impl<T> Stream<T> {
     pub fn advance(&mut self) -> Option<usize> {
-        if self.pointer >= self.data.len() - 1 {
+        if self.pointer_to_next + 1 >= self.data.len() {
             None
         } else {
-            self.pointer += 1;
-            Some(self.pointer)
+            self.pointer_to_next += 1;
+            Some(self.pointer_to_next)
         }
     }
 
     pub fn peek(&self) -> Option<&T> {
-        self.peek_many::<1>()
+        self.peek_many::<0>()
     }
 
     // Use a const param b/c dynamic lookahead feels like a bad idea.
+    /// Peek ahead of the next element.
+    ///
+    /// `N` is the amount to peek ahead of the next element.
+    /// e.g. 0 -> peeks next element.
+    ///      1 -> peeks the element after the next one.
     pub fn peek_many<const N: usize>(&self) -> Option<&T> {
-        self.data.get(self.pointer + N)
+        self.data.get(self.pointer_to_next + N)
     }
 
     pub fn advance_while(&mut self, f: impl Fn(&T) -> bool) -> usize {
