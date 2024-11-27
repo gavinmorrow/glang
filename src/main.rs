@@ -2,7 +2,9 @@
 
 use std::io;
 
+mod ast;
 mod lexer;
+mod parser;
 mod stream;
 
 fn main() {
