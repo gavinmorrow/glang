@@ -29,6 +29,18 @@ impl<T: Clone> Stream<T> {
             _ => None,
         }
     }
+
+    pub fn next_while(&mut self, f: impl Fn(&T) -> bool) -> Vec<T> {
+        let mut items = vec![];
+        while let Some(next) = self.peek() {
+            if f(next) {
+                items.push(self.next().expect("iterator has next item"));
+            } else {
+                break;
+            }
+        }
+        items
+    }
 }
 
 impl<T> Stream<T> {
@@ -42,7 +54,12 @@ impl<T> Stream<T> {
     }
 
     pub fn peek(&self) -> Option<&T> {
-        self.data.get(self.pointer + 1)
+        self.peek_many::<1>()
+    }
+
+    // Use a const param b/c dynamic lookahead feels like a bad idea.
+    pub fn peek_many<const N: usize>(&self) -> Option<&T> {
+        self.data.get(self.pointer + N)
     }
 
     pub fn advance_while(&mut self, f: impl Fn(&T) -> bool) -> usize {

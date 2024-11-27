@@ -44,7 +44,28 @@ pub fn lex(source: String) -> Vec<Token> {
                 }
             }
             digit if digit.is_ascii_digit() => {
-                todo!()
+                let mut digits = vec![digit];
+                digits.append(
+                    &mut source
+                        .next_while(|(_, c)| c.is_ascii_digit())
+                        .into_iter()
+                        .map(|(_, c)| c)
+                        .collect(),
+                );
+                if source.next_if_char('.').is_some() {
+                    digits.push('.');
+                    digits.append(
+                        &mut source
+                            .next_while(|(_, c)| c.is_ascii_digit())
+                            .into_iter()
+                            .map(|(_, c)| c)
+                            .collect(),
+                    );
+                }
+
+                let digits = String::from_iter(digits);
+                let num = digits.parse().expect("parsed string is valid f64");
+                Number(num)
             }
 
             whitespace if whitespace.is_whitespace() => continue,
