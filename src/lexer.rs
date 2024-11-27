@@ -16,6 +16,11 @@ pub fn lex(source: String) -> Vec<Token> {
             '(' => OpenParen,
             ')' => CloseParen,
 
+            '=' => source.equals_variant(Equals, EqualsEquals),
+            '!' => source.equals_variant(Bang, BangEquals),
+            '<' => source.equals_variant(Less, LessEquals),
+            '>' => source.equals_variant(Greater, GreaterEquals),
+
             '/' => {
                 if source.next_if_char('/').is_some() {
                     // Comsume until end of line!
@@ -25,10 +30,32 @@ pub fn lex(source: String) -> Vec<Token> {
                     Slash
                 }
             }
+            '"' => {
+                let mut chars = vec![];
+                while let Some((_, char)) = source.next_if(|(_, c)| *c != '"') {
+                    chars.push(char)
+                }
+                let s = String::from_iter(chars);
+
+                if source.next_if_char('"').is_some() {
+                    Str(s)
+                } else {
+                    Error(TokenError::UnterminatedStringLiteral)
+                }
+            }
+            digit if digit.is_ascii_digit() => {
+                todo!()
+            }
 
             whitespace if whitespace.is_whitespace() => continue,
             unexpected_char => Error(TokenError::UnexpectedChar(unexpected_char)),
         };
+
+        let token = Token {
+            data,
+            pos: Pos(pos),
+        };
+        tokens.push(token);
     }
 
     tokens
@@ -54,7 +81,8 @@ pub enum TokenData {
     Else,
     Or,
     And,
-    NotEquals,
+    Bang,
+    BangEquals,
     EqualsEquals,
     Less,
     LessEquals,
@@ -67,7 +95,7 @@ pub enum TokenData {
     True,
     False,
     Number(f64),
-    String(String),
+    Str(String),
     Identifier(String),
     OpenParen,
     CloseParen,
@@ -78,10 +106,19 @@ pub enum TokenData {
 #[derive(Clone, Debug)]
 pub enum TokenError {
     UnexpectedChar(char),
+    UnterminatedStringLiteral,
 }
 
 impl<T: Clone> Stream<(T, char)> {
     fn next_if_char(&mut self, expected: char) -> Option<(T, char)> {
         self.next_if(|(_, c)| *c == expected)
+    }
+
+    fn equals_variant(&mut self, no_eq: TokenData, eq: TokenData) -> TokenData {
+        if self.next_if_char('=').is_some() {
+            eq
+        } else {
+            no_eq
+        }
     }
 }
