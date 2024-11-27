@@ -45,22 +45,10 @@ pub fn lex(source: String) -> Vec<Token> {
             }
             digit if digit.is_ascii_digit() => {
                 let mut digits = vec![digit];
-                digits.append(
-                    &mut source
-                        .next_while(|(_, c)| c.is_ascii_digit())
-                        .into_iter()
-                        .map(|(_, c)| c)
-                        .collect(),
-                );
+                digits.append(&mut source.scan_digits());
                 if source.next_if_char('.').is_some() {
                     digits.push('.');
-                    digits.append(
-                        &mut source
-                            .next_while(|(_, c)| c.is_ascii_digit())
-                            .into_iter()
-                            .map(|(_, c)| c)
-                            .collect(),
-                    );
+                    digits.append(&mut source.scan_digits());
                 }
 
                 let digits = String::from_iter(digits);
@@ -141,5 +129,12 @@ impl<T: Clone> Stream<(T, char)> {
         } else {
             no_eq
         }
+    }
+
+    fn scan_digits(&mut self) -> Vec<char> {
+        self.next_while(|(_, c)| c.is_ascii_digit())
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect()
     }
 }
