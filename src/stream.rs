@@ -33,6 +33,7 @@ impl<T: Clone> Stream<T> {
         }
     }
 
+    // TODO: maybe return an iterator?
     pub fn next_while(&mut self, f: impl Fn(&T) -> bool) -> Vec<T> {
         let mut items = vec![];
         while let Some(next) = self.peek() {

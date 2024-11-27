@@ -62,6 +62,27 @@ pub fn lex(source: String) -> Vec<Token> {
                 let num = digits.parse().expect("parsed string is valid f64");
                 Number(num)
             }
+            ident if is_alpha(ident) => {
+                let mut ident = vec![ident];
+                ident.append(
+                    &mut source
+                        .next_while(|(_, c)| is_alphanumeric(*c))
+                        .into_iter()
+                        .map(|(_, c)| c)
+                        .collect(),
+                );
+                let ident = String::from_iter(ident);
+                match ident.as_str() {
+                    "let" => Let,
+                    "if" => If,
+                    "else" => Else,
+                    "or" => Or,
+                    "and" => And,
+                    "true" => True,
+                    "false" => False,
+                    _ => Identifier(ident),
+                }
+            }
 
             whitespace if whitespace.is_whitespace() => continue,
             unexpected_char => Error(TokenError::UnexpectedChar(unexpected_char)),
@@ -75,6 +96,14 @@ pub fn lex(source: String) -> Vec<Token> {
     }
 
     tokens
+}
+
+fn is_alphanumeric(ident: char) -> bool {
+    is_alpha(ident) || ident.is_ascii_digit()
+}
+
+fn is_alpha(ident: char) -> bool {
+    ident.is_alphabetic() || ident == '_'
 }
 
 #[derive(Clone, Debug)]
