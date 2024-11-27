@@ -106,16 +106,16 @@ fn is_alpha(ident: char) -> bool {
     ident.is_alphabetic() || ident == '_'
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Token {
-    data: TokenData,
-    pos: Pos,
+    pub data: TokenData,
+    pub pos: Pos,
 }
 
-#[derive(Clone, Debug)]
-pub struct Pos(usize);
+#[derive(Clone, Debug, PartialEq)]
+pub struct Pos(pub usize);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TokenData {
     Let,
     Semicolon,
@@ -148,7 +148,7 @@ pub enum TokenData {
     Error(TokenError),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TokenError {
     UnexpectedChar(char),
     UnterminatedStringLiteral,
