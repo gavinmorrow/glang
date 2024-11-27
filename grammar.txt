@@ -31,6 +31,8 @@ op             -> "or"
                 | "-" | "+"
                 | "/" | "*"
 
+unary_op       -> ( "!" | "-" ) primary
+
 primary        -> "true"
                 | "false"
                 | NUMBER
