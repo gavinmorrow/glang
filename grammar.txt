@@ -7,6 +7,7 @@ statement      -> "let" binding ";"
                 | expression ";"
 
 binding        -> pattern "=" expression
+pattern        -> IDENTIFIER
 
 expression     -> block
                 | call
@@ -27,7 +28,7 @@ binary_op      -> binary_op op binary_op
 op             -> "or"
                 | "and"
                 | "!=" | "=="
-                | ">" | ">=" | "<" | "<="
+                | "<" | "<=" | ">" | ">="
                 | "-" | "+"
                 | "/" | "*"
 
@@ -48,9 +49,9 @@ DIGIT          -> "0" ... "9"
 
 
 example program: ```
-let answer = random(0, 10);
+let answer = random 0 10;
 let ask_until_correct acc_times = {
-    let guess = input("> ");
+    let guess = input "> ";
     let acc_times = acc_times + 1;
     if guess == answer {
         acc_times
