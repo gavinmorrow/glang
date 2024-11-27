@@ -46,7 +46,14 @@ pub fn lex(source: String) -> Vec<Token> {
             digit if digit.is_ascii_digit() => {
                 let mut digits = vec![digit];
                 digits.append(&mut source.scan_digits());
-                if source.next_if_char('.').is_some() {
+
+                // Check for the digit before the `.` because it will
+                // short-circuit before the next_if side-effect happens.
+                if source
+                    .peek_many::<1>()
+                    .is_some_and(|(_, c)| c.is_ascii_digit())
+                    && source.next_if_char('.').is_some()
+                {
                     digits.push('.');
                     digits.append(&mut source.scan_digits());
                 }
