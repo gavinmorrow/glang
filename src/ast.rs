@@ -8,11 +8,11 @@ pub enum Stmt {
 
 #[derive(Clone, Debug)]
 pub struct Binding {
-    pattern: Pattern,
-    value: Expr,
+    pub pattern: Pattern,
+    pub value: Expr,
 }
 #[derive(Clone, Debug)]
-pub struct Pattern(Identifier);
+pub struct Pattern(pub Identifier);
 
 #[derive(Clone, Debug)]
 pub enum Expr {
@@ -30,15 +30,15 @@ pub struct Block(Vec<Stmt>);
 
 #[derive(Clone, Debug)]
 pub struct Call {
-    target: Box<Expr>,
-    arguments: Vec<Expr>,
+    pub target: Box<Expr>,
+    pub arguments: Vec<Expr>,
 }
 
 #[derive(Clone, Debug)]
 pub struct IfExpr {
-    condition: Expr,
-    then_block: Block,
-    else_block: ElseBlock,
+    pub condition: Expr,
+    pub then_block: Block,
+    pub else_block: ElseBlock,
 }
 #[derive(Clone, Debug)]
 pub enum ElseBlock {
@@ -48,9 +48,9 @@ pub enum ElseBlock {
 
 #[derive(Clone, Debug)]
 pub struct BinaryExpr {
-    lhs: Expr,
-    op: BinaryOp,
-    rhs: Expr,
+    pub lhs: Expr,
+    pub op: BinaryOp,
+    pub rhs: Expr,
 }
 #[derive(Clone, Debug)]
 pub enum BinaryOp {
@@ -74,8 +74,8 @@ pub enum BinaryOp {
 
 #[derive(Clone, Debug)]
 pub struct UnaryExpr {
-    op: UnaryOp,
-    rhs: Expr,
+    pub op: UnaryOp,
+    pub rhs: Expr,
 }
 #[derive(Clone, Debug)]
 pub enum UnaryOp {
@@ -92,5 +92,5 @@ pub enum Literal {
 
 #[derive(Clone, Debug)]
 pub struct Identifier {
-    name: String,
+    pub name: String,
 }
