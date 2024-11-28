@@ -9,37 +9,29 @@ statement      -> "let" binding ";"
 binding        -> pattern "=" expression
 pattern        -> IDENTIFIER
 
-expression     -> block
-                | call
-                | if_expr
-                | binary_op
-                | unary_op
-                | primary
+expression     -> logic_or
 
 block          -> "{" statement* "}"
-
-call           -> primary arguments?
-arguments      -> expression*
+                | if_expr
 
 if_expr        -> "if" expression block ( "else" (if_expr | block) )?
 
-binary_op      -> binary_op op binary_op
-                | expression
-op             -> "or"
-                | "and"
-                | "!=" | "=="
-                | "<" | "<=" | ">" | ">="
-                | "-" | "+"
-                | "/" | "*"
+logic_or       -> ( logic_or "or" )? logic_and
+logic_and      -> ( logic_and "and" )? equality
+equality       -> ( equality ( "<" | "<=" | ">" | ">=" ) )? term
+term           -> ( term ( "-" | "+" ) )? factor
+factor         -> ( factor ( "/" | "*" ) )? unary
+unary          -> ( "!" | "-" )? unary | call
 
-unary_op       -> ( "!" | "-" ) primary
+call           -> primary arguments?
+arguments      -> expression*
 
 primary        -> "true"
                 | "false"
                 | NUMBER
                 | STRING
                 | IDENTIFIER
-                | "(" expression ")"
+                | block
 
 NUMBER         -> DIGIT+ ( "." DIGIT+ )?
 STRING         -> "\"" <any non-"\"" character>* "\""

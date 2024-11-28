@@ -1,5 +1,8 @@
 use crate::{
-    ast::{Binding, Expr, Identifier, Pattern, Program, Stmt},
+    ast::{
+        BinaryExpr, BinaryOp, Binding, Call, Expr, Identifier, Pattern, Program, Stmt, UnaryExpr,
+        UnaryOp,
+    },
     lexer::{Token, TokenData},
     stream::Stream,
 };
@@ -54,7 +57,108 @@ impl Parser {
     }
 
     fn parse_expr(&mut self) -> Parse<Expr> {
-        todo!()
+        let binary_expr = self.parse_logic_or()?;
+        Ok(binary_expr)
+    }
+
+    fn parse_binary_expr(
+        &mut self,
+        mut parse_operand: impl FnMut(&mut Parser) -> Parse<Expr>,
+        parse_operator: impl Fn(&Token) -> Option<BinaryOp>,
+    ) -> Parse<Expr> {
+        let mut lhs = parse_operand(self)?;
+
+        while let Some(op) = self.tokens.next_if_map(&parse_operator) {
+            let rhs = parse_operand(self)?;
+            lhs = Expr::Binary(Box::new(BinaryExpr { lhs, op, rhs }));
+        }
+
+        Ok(lhs)
+    }
+
+    fn parse_logic_or(&mut self) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_logic_and, |t| match t.data {
+            TokenData::Or => Some(BinaryOp::Or),
+            _ => None,
+        })
+    }
+
+    fn parse_logic_and(&mut self) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_equality, |t| match t.data {
+            TokenData::And => Some(BinaryOp::And),
+            _ => None,
+        })
+    }
+
+    fn parse_equality(&mut self) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_term, |t| match t.data {
+            TokenData::Less => Some(BinaryOp::Less),
+            TokenData::LessEquals => Some(BinaryOp::LessEq),
+            TokenData::Greater => Some(BinaryOp::Greater),
+            TokenData::GreaterEquals => Some(BinaryOp::GreaterEq),
+            _ => None,
+        })
+    }
+
+    fn parse_term(&mut self) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_factor, |t| match t.data {
+            TokenData::Minus => Some(BinaryOp::Subtract),
+            TokenData::Plus => Some(BinaryOp::Add),
+            _ => None,
+        })
+    }
+
+    fn parse_factor(&mut self) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_unary, |t| match t.data {
+            TokenData::Slash => Some(BinaryOp::Divide),
+            TokenData::Star => Some(BinaryOp::Multiply),
+            _ => None,
+        })
+    }
+
+    fn parse_unary(&mut self) -> Parse<Expr> {
+        let op = self.tokens.next_if_map(|t| match t.data {
+            TokenData::Bang => Some(UnaryOp::Not),
+            TokenData::Minus => Some(UnaryOp::Negate),
+            _ => None,
+        });
+
+        if let Some(op) = op {
+            let rhs = self.parse_unary()?;
+            Ok(Expr::Unary(Box::new(UnaryExpr { op, rhs })))
+        } else {
+            self.parse_call()
+        }
+    }
+
+    fn parse_call(&mut self) -> Parse<Expr> {
+        let target = self.parse_primary()?;
+
+        let mut arguments = vec![];
+        while let Ok(arg) = self.parse_expr() {
+            arguments.push(arg);
+        }
+
+        if arguments.is_empty() {
+            Ok(target)
+        } else {
+            let target = Box::new(target);
+            Ok(Expr::Call(Call { target, arguments }))
+        }
+    }
+
+    fn parse_primary(&mut self) -> Parse<Expr> {
+        use crate::ast::Literal::{Bool, Number, Str};
+        use Expr::Literal;
+        self.tokens
+            .next_if_map(|t| match &t.data {
+                TokenData::True => Some(Literal(Bool(true))),
+                TokenData::False => Some(Literal(Bool(false))),
+                TokenData::Number(n) => Some(Literal(Number(*n))),
+                TokenData::Str(s) => Some(Literal(Str(s.clone()))),
+                _ => None,
+            })
+            .ok_or(Error::ExpectedPrimary)
     }
 
     fn parse_identifier(&mut self) -> Parse<Identifier> {
@@ -87,16 +191,15 @@ impl Parser {
     }
 }
 
-fn stmt(tokens: &mut Stream<Token>) -> Parse<Stmt> {
-    if tokens.advance_if_token(TokenData::Let) {
-        // let binding = binding(tokens)?;
-    }
-    todo!()
-}
-
+#[allow(
+    clippy::enum_variant_names,
+    reason = "Not repeating the enum name, and adds important context."
+)]
 pub enum Error {
     ExpectedToken(TokenData),
     ExpectedIdentifier,
+    ExpectedPrimary,
+    ExpectedUnary,
 }
 
 impl Stream<Token> {

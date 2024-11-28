@@ -33,6 +33,12 @@ impl<T: Clone> Stream<T> {
         }
     }
 
+    pub fn next_if_map<U>(&mut self, f: impl FnOnce(&T) -> Option<U>) -> Option<U> {
+        self.peek().and_then(f).inspect(|_| {
+            self.next().expect("just peeked and element should exist");
+        })
+    }
+
     // TODO: maybe return an iterator?
     pub fn next_while(&mut self, f: impl Fn(&T) -> bool) -> Vec<T> {
         let mut items = vec![];
