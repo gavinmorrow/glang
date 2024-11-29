@@ -3,6 +3,7 @@
 use std::io;
 
 mod ast;
+mod interperter;
 mod lexer;
 mod parser;
 mod stream;
@@ -20,8 +21,16 @@ fn main() {
 
 fn run(source: String) {
     let tokens = lexer::lex(source);
-    println!("{tokens:#?}");
+    // println!("{tokens:#?}");
 
     let ast = parser::parse(tokens);
-    println!("{ast:#?}");
+    // println!("{ast:#?}");
+
+    match ast {
+        Ok(ast) => {
+            let res = interperter::interpert(ast);
+            println!("{res:#?}");
+        }
+        Err(err) => println!("Error while parsing AST: {err:#?}"),
+    }
 }
