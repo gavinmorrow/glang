@@ -26,7 +26,7 @@ pub enum Expr {
 }
 
 #[derive(Clone, Debug)]
-pub struct Block(Vec<Stmt>);
+pub struct Block(pub Vec<Stmt>);
 
 #[derive(Clone, Debug)]
 pub struct Call {
@@ -38,7 +38,7 @@ pub struct Call {
 pub struct IfExpr {
     pub condition: Expr,
     pub then_block: Block,
-    pub else_block: ElseBlock,
+    pub else_block: Option<ElseBlock>,
 }
 #[derive(Clone, Debug)]
 pub enum ElseBlock {

@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        BinaryExpr, BinaryOp, Binding, Call, Expr, Identifier, Pattern, Program, Stmt, UnaryExpr,
-        UnaryOp,
+        BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Pattern,
+        Program, Stmt, UnaryExpr, UnaryOp,
     },
     lexer::{Pos, Token, TokenData},
     stream::Stream,
@@ -154,16 +154,61 @@ impl Parser {
     fn parse_primary(&mut self) -> Parse<Expr> {
         use crate::ast::Literal::{Bool, Number, Str};
         use Expr::Literal;
-        self.consume_map(
-            |t| match &t.data {
-                TokenData::True => Some(Literal(Bool(true))),
-                TokenData::False => Some(Literal(Bool(false))),
-                TokenData::Number(n) => Some(Literal(Number(*n))),
-                TokenData::Str(s) => Some(Literal(Str(s.clone()))),
-                _ => None,
-            },
-            ErrorKind::ExpectedPrimary,
-        )
+        if self.matches(&TokenData::OpenBrace) {
+            let block = self.parse_block()?;
+            Ok(Expr::Block(block))
+        } else if self.matches(&TokenData::If) {
+            let if_expr = self.parse_if_expr()?;
+            Ok(Expr::If(Box::new(if_expr)))
+        } else {
+            self.consume_map(
+                |t| match &t.data {
+                    TokenData::True => Some(Literal(Bool(true))),
+                    TokenData::False => Some(Literal(Bool(false))),
+                    TokenData::Number(n) => Some(Literal(Number(*n))),
+                    TokenData::Str(s) => Some(Literal(Str(s.clone()))),
+                    TokenData::Identifier(name) => {
+                        Some(Expr::Identifier(Identifier { name: name.clone() }))
+                    }
+                    _ => None,
+                },
+                ErrorKind::ExpectedPrimary,
+            )
+        }
+    }
+
+    fn parse_block(&mut self) -> Parse<Block> {
+        let mut stmts = vec![];
+        while self.tokens.peek().is_some() {
+            let stmt = self.parse_stmt()?;
+            stmts.push(stmt);
+        }
+
+        self.expect(TokenData::CloseBrace)?;
+
+        Ok(Block(stmts))
+    }
+
+    fn parse_if_expr(&mut self) -> Parse<IfExpr> {
+        let condition = self.parse_expr()?;
+        self.expect(TokenData::OpenBrace)?;
+        let then_block = self.parse_block()?;
+
+        let else_block = if self.matches(&TokenData::Else) {
+            Some(if self.matches(&TokenData::If) {
+                ElseBlock::ElseIf(Box::new(self.parse_if_expr()?))
+            } else {
+                ElseBlock::Else(self.parse_block()?)
+            })
+        } else {
+            None
+        };
+
+        Ok(IfExpr {
+            condition,
+            then_block,
+            else_block,
+        })
     }
 
     fn parse_identifier(&mut self) -> Parse<Identifier> {
