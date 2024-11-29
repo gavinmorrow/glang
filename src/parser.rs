@@ -7,6 +7,10 @@ use crate::{
     stream::Stream,
 };
 
+pub fn parse(tokens: Vec<Token>) -> Parse<Program> {
+    Parser::new(tokens).parse_program()
+}
+
 pub type Parse<T> = Result<T, Error>;
 
 struct Parser {
@@ -195,6 +199,7 @@ impl Parser {
     clippy::enum_variant_names,
     reason = "Not repeating the enum name, and adds important context."
 )]
+#[derive(Debug)]
 pub enum Error {
     ExpectedToken(TokenData),
     ExpectedIdentifier,

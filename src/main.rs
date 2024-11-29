@@ -21,4 +21,7 @@ fn main() {
 fn run(source: String) {
     let tokens = lexer::lex(source);
     println!("{tokens:#?}");
+
+    let ast = parser::parse(tokens);
+    println!("{ast:#?}");
 }

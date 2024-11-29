@@ -68,7 +68,7 @@ impl<T: PartialEq> Stream<T> {
 
 impl<T> Stream<T> {
     pub fn advance(&mut self) -> Option<usize> {
-        if self.pointer_to_next + 1 >= self.data.len() {
+        if self.pointer_to_next >= self.data.len() {
             None
         } else {
             self.pointer_to_next += 1;
