@@ -3,7 +3,7 @@ use crate::{
         BinaryExpr, BinaryOp, Binding, Call, Expr, Identifier, Pattern, Program, Stmt, UnaryExpr,
         UnaryOp,
     },
-    lexer::{Token, TokenData},
+    lexer::{Pos, Token, TokenData},
     stream::Stream,
 };
 
@@ -154,23 +154,30 @@ impl Parser {
     fn parse_primary(&mut self) -> Parse<Expr> {
         use crate::ast::Literal::{Bool, Number, Str};
         use Expr::Literal;
-        self.tokens
-            .next_if_map(|t| match &t.data {
+        self.consume_map(
+            |t| match &t.data {
                 TokenData::True => Some(Literal(Bool(true))),
                 TokenData::False => Some(Literal(Bool(false))),
                 TokenData::Number(n) => Some(Literal(Number(*n))),
                 TokenData::Str(s) => Some(Literal(Str(s.clone()))),
                 _ => None,
-            })
-            .ok_or(Error::ExpectedPrimary)
+            },
+            ErrorKind::ExpectedPrimary,
+        )
     }
 
     fn parse_identifier(&mut self) -> Parse<Identifier> {
         let Some(next) = self.tokens.peek() else {
-            return Err(Error::ExpectedIdentifier);
+            return Err(Error {
+                pos: None,
+                kind: ErrorKind::ExpectedIdentifier,
+            });
         };
         let TokenData::Identifier(name) = &next.data else {
-            return Err(Error::ExpectedIdentifier);
+            return Err(Error {
+                pos: Some(next.pos),
+                kind: ErrorKind::ExpectedIdentifier,
+            });
         };
         let name = name.clone();
         Ok(Identifier { name })
@@ -182,25 +189,36 @@ impl Parser {
         self.tokens.advance_if(|t| &t.data == expected_type)
     }
 
-    fn consume(&mut self, f: impl Fn(&Token) -> bool, err: Error) -> Parse<Token> {
-        self.tokens.next_if(f).ok_or(err)
+    fn consume_map<U>(&mut self, f: impl Fn(&Token) -> Option<U>, err: ErrorKind) -> Parse<U> {
+        self.tokens.next_if_map(f).ok_or_else(|| Error {
+            pos: self.tokens.peek().map(|t| t.pos),
+            kind: err,
+        })
     }
 
     fn expect(&mut self, expected_type: TokenData) -> Parse<()> {
         if self.matches(&expected_type) {
             Ok(())
         } else {
-            Err(Error::ExpectedToken(expected_type))
+            Err(Error {
+                pos: self.tokens.peek().map(|t| t.pos),
+                kind: ErrorKind::ExpectedToken(expected_type),
+            })
         }
     }
 }
 
+#[derive(Debug)]
+pub struct Error {
+    pos: Option<Pos>,
+    kind: ErrorKind,
+}
 #[allow(
     clippy::enum_variant_names,
     reason = "Not repeating the enum name, and adds important context."
 )]
 #[derive(Debug)]
-pub enum Error {
+pub enum ErrorKind {
     ExpectedToken(TokenData),
     ExpectedIdentifier,
     ExpectedPrimary,

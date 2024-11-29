@@ -112,7 +112,7 @@ pub struct Token {
     pub pos: Pos,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Pos(pub usize);
 
 #[derive(Clone, Debug, PartialEq)]
