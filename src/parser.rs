@@ -185,13 +185,10 @@ impl Parser {
 
     fn parse_block(&mut self) -> Parse<Block> {
         let mut stmts = vec![];
-        while self.tokens.peek().is_some() {
+        while !self.matches(&TokenData::CloseBrace) {
             let stmt = self.parse_stmt()?;
             stmts.push(stmt);
         }
-
-        dbg!(&stmts);
-        self.expect(TokenData::CloseBrace)?;
 
         Ok(Block(stmts))
     }
