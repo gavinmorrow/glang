@@ -158,8 +158,14 @@ impl Parser {
     }
 
     fn parse_arguments<T>(&mut self, parse_arg: impl Fn(&mut Parser) -> Parse<T>) -> Parse<Vec<T>> {
+        if self.matches(&TokenData::CloseParen) {
+            return Ok(vec![]);
+        }
+
+        // There is at least one argument
         let mut arguments = vec![];
-        while let Ok(arg) = parse_arg(self) {
+        loop {
+            let arg = parse_arg(self)?;
             arguments.push(arg);
 
             if self.matches(&TokenData::CloseParen) {
