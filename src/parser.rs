@@ -138,17 +138,23 @@ impl Parser {
     fn parse_call(&mut self) -> Parse<Expr> {
         let target = self.parse_primary()?;
 
+        if !self.matches(&TokenData::OpenParen) {
+            return Ok(target);
+        }
+
         let mut arguments = vec![];
         while let Ok(arg) = self.parse_expr() {
             arguments.push(arg);
+
+            if self.matches(&TokenData::CloseParen) {
+                break;
+            } else {
+                self.expect(TokenData::Comma)?;
+            }
         }
 
-        if arguments.is_empty() {
-            Ok(target)
-        } else {
-            let target = Box::new(target);
-            Ok(Expr::Call(Call { target, arguments }))
-        }
+        let target = Box::new(target);
+        Ok(Expr::Call(Call { target, arguments }))
     }
 
     fn parse_primary(&mut self) -> Parse<Expr> {
@@ -192,7 +198,6 @@ impl Parser {
 
     fn parse_if_expr(&mut self) -> Parse<IfExpr> {
         let condition = self.parse_expr()?;
-        dbg!(&condition, self.tokens.peek());
         self.expect(TokenData::OpenBrace)?;
         let then_block = self.parse_block()?;
 

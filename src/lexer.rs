@@ -15,6 +15,7 @@ pub fn lex(source: String) -> Vec<Token> {
             '}' => CloseBrace,
             '(' => OpenParen,
             ')' => CloseParen,
+            ',' => Comma,
 
             '=' => source.equals_variant(Equals, EqualsEquals),
             '!' => source.equals_variant(Bang, BangEquals),
@@ -146,6 +147,7 @@ pub enum TokenData {
     CloseParen,
 
     Error(TokenError),
+    Comma,
 }
 
 #[derive(Clone, Debug, PartialEq)]

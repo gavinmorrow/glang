@@ -24,7 +24,7 @@ factor         -> ( factor ( "/" | "*" ) )? unary
 unary          -> ( "!" | "-" )? unary | call
 
 call           -> primary arguments?
-arguments      -> expression*
+arguments      -> "(" ( expression "," )* expression? ")"
 
 primary        -> "true"
                 | "false"
@@ -41,9 +41,9 @@ DIGIT          -> "0" ... "9"
 
 
 example program: ```
-let answer = random 0 10;
-let ask_until_correct acc_times = {
-    let guess = input "> ";
+let answer = random(0, 10);
+let ask_until_correct(acc_times) = {
+    let guess = input("> ");
     let acc_times = acc_times + 1;
     if guess == answer {
         acc_times
@@ -51,8 +51,8 @@ let ask_until_correct acc_times = {
         ask_until_correct acc_times
     }
 };
-let guesses_used = ask_until_correct 0;
-print (if guesses_used < 5 {
+let guesses_used = ask_until_correct(0);
+print(if guesses_used < 5 {
     "Woah, you're lucky!"
 } else if guesses_used <= 10 {
     "Not too bad."
