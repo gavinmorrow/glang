@@ -9,6 +9,7 @@ pub enum Stmt {
 #[derive(Clone, Debug)]
 pub struct Binding {
     pub pattern: Pattern,
+    pub arguments: Option<Vec<Pattern>>,
     pub value: Expr,
 }
 #[derive(Clone, Debug)]

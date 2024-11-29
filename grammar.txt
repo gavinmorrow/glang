@@ -6,7 +6,8 @@ program        -> statement*
 statement      -> "let" binding ";"
                 | expression ";"
 
-binding        -> pattern "=" expression
+binding        -> pattern binding_args? "=" expression
+binding_args   -> "(" ( pattern "," )* pattern? ")"
 pattern        -> IDENTIFIER
 
 expression     -> logic_or
@@ -23,8 +24,8 @@ term           -> ( term ( "-" | "+" ) )? factor
 factor         -> ( factor ( "/" | "*" ) )? unary
 unary          -> ( "!" | "-" )? unary | call
 
-call           -> primary arguments?
-arguments      -> "(" ( expression "," )* expression? ")"
+call           -> primary call_arguments?
+call_arguments -> "(" ( expression "," )* expression? ")"
 
 primary        -> "true"
                 | "false"

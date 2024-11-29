@@ -49,10 +49,20 @@ impl Parser {
 
     fn parse_binding(&mut self) -> Parse<Binding> {
         let pattern = self.parse_pattern()?;
+        let arguments = if self.matches(&TokenData::OpenParen) {
+            Some(self.parse_arguments(Self::parse_pattern)?)
+        } else {
+            None
+        };
+
         self.expect(TokenData::Equals)?;
         let value = self.parse_expr()?;
 
-        Ok(Binding { pattern, value })
+        Ok(Binding {
+            pattern,
+            arguments,
+            value,
+        })
     }
 
     fn parse_pattern(&mut self) -> Parse<Pattern> {
@@ -142,8 +152,14 @@ impl Parser {
             return Ok(target);
         }
 
+        let arguments = self.parse_arguments(Self::parse_expr)?;
+        let target = Box::new(target);
+        Ok(Expr::Call(Call { target, arguments }))
+    }
+
+    fn parse_arguments<T>(&mut self, parse_arg: impl Fn(&mut Parser) -> Parse<T>) -> Parse<Vec<T>> {
         let mut arguments = vec![];
-        while let Ok(arg) = self.parse_expr() {
+        while let Ok(arg) = parse_arg(self) {
             arguments.push(arg);
 
             if self.matches(&TokenData::CloseParen) {
@@ -152,9 +168,7 @@ impl Parser {
                 self.expect(TokenData::Comma)?;
             }
         }
-
-        let target = Box::new(target);
-        Ok(Expr::Call(Call { target, arguments }))
+        Ok(arguments)
     }
 
     fn parse_primary(&mut self) -> Parse<Expr> {
