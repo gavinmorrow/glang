@@ -202,6 +202,7 @@ impl Parser {
             Some(if self.matches(&TokenData::If) {
                 ElseBlock::ElseIf(Box::new(self.parse_if_expr()?))
             } else {
+                self.expect(TokenData::OpenBrace)?;
                 ElseBlock::Else(self.parse_block()?)
             })
         } else {
