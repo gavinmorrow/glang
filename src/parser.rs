@@ -184,6 +184,7 @@ impl Parser {
             stmts.push(stmt);
         }
 
+        dbg!(&stmts);
         self.expect(TokenData::CloseBrace)?;
 
         Ok(Block(stmts))
@@ -191,6 +192,7 @@ impl Parser {
 
     fn parse_if_expr(&mut self) -> Parse<IfExpr> {
         let condition = self.parse_expr()?;
+        dbg!(&condition, self.tokens.peek());
         self.expect(TokenData::OpenBrace)?;
         let then_block = self.parse_block()?;
 
@@ -212,19 +214,13 @@ impl Parser {
     }
 
     fn parse_identifier(&mut self) -> Parse<Identifier> {
-        let Some(next) = self.tokens.peek() else {
-            return Err(Error {
-                pos: None,
-                kind: ErrorKind::ExpectedIdentifier,
-            });
-        };
-        let TokenData::Identifier(name) = &next.data else {
-            return Err(Error {
-                pos: Some(next.pos),
-                kind: ErrorKind::ExpectedIdentifier,
-            });
-        };
-        let name = name.clone();
+        let name = self.consume_map(
+            |t| match &t.data {
+                TokenData::Identifier(name) => Some(name.clone()),
+                _ => None,
+            },
+            ErrorKind::ExpectedIdentifier,
+        )?;
         Ok(Identifier { name })
     }
 }
