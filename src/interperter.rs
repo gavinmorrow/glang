@@ -98,22 +98,41 @@ impl Evaluate for BinaryExpr {
                 }
             }
             BinaryOp::And => {
-                if lhs.is_truthy() {
-                    rhs()?
-                } else {
+                if lhs.is_falsy() {
                     lhs
+                } else {
+                    rhs()?
                 }
             }
             BinaryOp::NotEq => Bool(lhs != rhs()?),
             BinaryOp::Eq => Bool(lhs == rhs()?),
-            BinaryOp::Greater => todo!(),
-            BinaryOp::GreaterEq => todo!(),
-            BinaryOp::Less => todo!(),
-            BinaryOp::LessEq => todo!(),
-            BinaryOp::Subtract => todo!(),
-            BinaryOp::Add => todo!(),
-            BinaryOp::Divide => todo!(),
-            BinaryOp::Multiply => todo!(),
+            BinaryOp::Greater => Bool(lhs.as_num()? > rhs()?.as_num()?),
+            BinaryOp::GreaterEq => Bool(lhs.as_num()? >= rhs()?.as_num()?),
+            BinaryOp::Less => Bool(lhs.as_num()? < rhs()?.as_num()?),
+            BinaryOp::LessEq => Bool(lhs.as_num()? <= rhs()?.as_num()?),
+            BinaryOp::Subtract => Num(lhs.as_num()? - rhs()?.as_num()?),
+            BinaryOp::Add => match (lhs, rhs()?) {
+                (Num(a), Num(b)) => Num(a + b),
+                (Str(a), Num(b)) => Str(a + &b.to_string()),
+                (Num(a), Str(b)) => Str(a.to_string() + &b),
+                (Str(a), Str(b)) => Str(a + &b),
+
+                // Errors:
+                (Num(_), b) | (Str(_), b) => {
+                    return Err(Error::new(ErrorKind::TypeError {
+                        expected: DiagnosticType::Num,
+                        actual: (&b).into(),
+                    }))
+                }
+                (a, _) => {
+                    return Err(Error::new(ErrorKind::TypeError {
+                        expected: DiagnosticType::Num,
+                        actual: (&a).into(),
+                    }))
+                }
+            },
+            BinaryOp::Divide => Num(lhs.as_num()? / rhs()?.as_num()?),
+            BinaryOp::Multiply => Num(lhs.as_num()? * rhs()?.as_num()?),
         })
     }
 }
@@ -146,7 +165,30 @@ pub enum Value {
 
 impl Value {
     fn is_truthy(&self) -> bool {
-        !matches!(self, Value::Bool(false))
+        !self.is_falsy()
+    }
+    fn is_falsy(&self) -> bool {
+        matches!(self, Value::Bool(false))
+    }
+
+    fn as_num(&self) -> Result<f64> {
+        match self {
+            Self::Num(n) => Ok(*n),
+            _ => Err(Error::new(ErrorKind::TypeError {
+                expected: DiagnosticType::Num,
+                actual: DiagnosticType::from(self),
+            })),
+        }
+    }
+
+    fn as_str(&self) -> Result<String> {
+        match self {
+            Self::Str(s) => Ok(s.clone()),
+            _ => Err(Error::new(ErrorKind::TypeError {
+                expected: DiagnosticType::Str,
+                actual: DiagnosticType::from(self),
+            })),
+        }
     }
 }
 
@@ -155,5 +197,34 @@ pub struct Error {
     kind: ErrorKind,
 }
 
+impl Error {
+    pub fn new(kind: ErrorKind) -> Self {
+        Self { kind }
+    }
+}
+
 #[derive(Debug)]
-pub enum ErrorKind {}
+pub enum ErrorKind {
+    TypeError {
+        expected: DiagnosticType,
+        actual: DiagnosticType,
+    },
+}
+
+#[derive(Debug)]
+pub enum DiagnosticType {
+    Bool,
+    Num,
+    Str,
+    Void,
+}
+impl From<&Value> for DiagnosticType {
+    fn from(value: &Value) -> Self {
+        match value {
+            Value::Bool(_) => Self::Bool,
+            Value::Num(_) => Self::Num,
+            Value::Str(_) => Self::Str,
+            Value::Void => Self::Void,
+        }
+    }
+}
