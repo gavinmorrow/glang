@@ -1,6 +1,6 @@
 use crate::ast::{
     BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Literal,
-    Program, Stmt, UnaryExpr,
+    Program, Stmt, UnaryExpr, UnaryOp,
 };
 
 pub fn interpert(program: Program) -> Result<Value> {
@@ -139,13 +139,21 @@ impl Evaluate for BinaryExpr {
 
 impl Evaluate for UnaryExpr {
     fn evaluate(&self) -> Result<Value> {
-        todo!()
+        let rhs = self.rhs.evaluate()?;
+        match self.op {
+            UnaryOp::Not => Ok(Value::Bool(!rhs.is_truthy())),
+            UnaryOp::Negate => Ok(Value::Num(-rhs.as_num()?)),
+        }
     }
 }
 
 impl Evaluate for Literal {
     fn evaluate(&self) -> Result<Value> {
-        todo!()
+        Ok(match self {
+            Literal::Bool(b) => Value::Bool(*b),
+            Literal::Number(n) => Value::Num(*n),
+            Literal::Str(s) => Value::Str(s.clone()),
+        })
     }
 }
 
