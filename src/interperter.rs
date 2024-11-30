@@ -1,4 +1,4 @@
-mod env;
+pub mod env;
 
 use env::{Environment, Scope};
 
@@ -7,10 +7,8 @@ use crate::ast::{
     Program, Stmt, UnaryExpr, UnaryOp,
 };
 
-pub fn interpert(program: Program) -> Result<Value> {
-    let mut env = Environment::new();
-    let scope = Scope::new();
-    program.evaluate(&mut env, scope)
+pub fn interpert(program: Program, env: &mut Environment, scope: Scope) -> Result<Value> {
+    program.evaluate(env, scope)
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -39,7 +37,21 @@ impl Evaluate for Stmt {
 
 impl Evaluate for Binding {
     fn evaluate(&self, env: &mut Environment, scope: Scope) -> Result<Value> {
-        todo!()
+        match &self.arguments {
+            Some(arguments) => {
+                // define a function
+                todo!("defining functions")
+            }
+            None => {
+                // define a variable
+                let name = self.pattern.0.name.clone();
+                let value = self.value.evaluate(env, scope.clone())?;
+
+                env.define(env::Identifier::new(scope, name), value);
+
+                Ok(Value::Void)
+            }
+        }
     }
 }
 
@@ -69,7 +81,7 @@ impl Evaluate for Block {
 
 impl Evaluate for Call {
     fn evaluate(&self, env: &mut Environment, scope: Scope) -> Result<Value> {
-        todo!()
+        todo!("calling functions")
     }
 }
 
@@ -165,7 +177,13 @@ impl Evaluate for Literal {
 
 impl Evaluate for Identifier {
     fn evaluate(&self, env: &mut Environment, scope: Scope) -> Result<Value> {
-        todo!()
+        env.get(&env::Identifier::new(scope, self.name.clone()))
+            .ok_or_else(|| {
+                Error::new(ErrorKind::VariableNotDefinied {
+                    name: self.name.clone(),
+                })
+            })
+            .cloned()
     }
 }
 
@@ -222,6 +240,9 @@ pub enum ErrorKind {
     TypeError {
         expected: DiagnosticType,
         actual: DiagnosticType,
+    },
+    VariableNotDefinied {
+        name: String,
     },
 }
 
