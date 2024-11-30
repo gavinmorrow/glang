@@ -28,6 +28,7 @@ fn run(source: String) {
 
     match ast {
         Ok(ast) => {
+            eprintln!("ast: {ast:#?}");
             let res = interperter::interpert(ast);
             println!("{res:#?}");
         }

@@ -105,6 +105,14 @@ impl Parser {
     }
 
     fn parse_equality(&mut self) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_comparison, |t| match t.data {
+            TokenData::BangEquals => Some(BinaryOp::NotEq),
+            TokenData::EqualsEquals => Some(BinaryOp::Eq),
+            _ => None,
+        })
+    }
+
+    fn parse_comparison(&mut self) -> Parse<Expr> {
         self.parse_binary_expr(Self::parse_term, |t| match t.data {
             TokenData::Less => Some(BinaryOp::Less),
             TokenData::LessEquals => Some(BinaryOp::LessEq),
