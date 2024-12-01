@@ -43,7 +43,6 @@ fn run(source: String, env: &mut Environment, scope: Scope) {
 
     match ast {
         Ok(ast) => {
-            eprintln!("ast: {ast:#?}");
             let res = interperter::interpert(ast, env, scope);
             println!("{res:#?}");
         }
