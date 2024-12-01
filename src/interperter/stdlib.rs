@@ -1,9 +1,8 @@
 use std::io::Write;
 
-use super::{
-    env::{Environment, Identifier, Scope},
-    Error, ErrorKind, Func, NativeFunc, Value,
-};
+use crate::ast::{Identifier, Scope};
+
+use super::{env::Environment, Error, ErrorKind, Func, NativeFunc, Value};
 
 impl Environment {
     pub fn new_root() -> (Self, Scope) {
@@ -12,10 +11,7 @@ impl Environment {
 
         define_stdlib(&mut root, root_scope.clone());
 
-        // Define a new scope so that user code can't overwrite the stdlib
-        let scope = root_scope.nest();
-
-        (root, scope)
+        (root, root_scope)
     }
 }
 

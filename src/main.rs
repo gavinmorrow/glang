@@ -1,6 +1,7 @@
 use std::{fs, io};
 
-use interperter::env::{Environment, Scope};
+use ast::Scope;
+use interperter::env::Environment;
 
 mod ast;
 mod interperter;
@@ -38,12 +39,12 @@ fn run(source: String, env: &mut Environment, scope: Scope) {
     let tokens = lexer::lex(source);
     // println!("{tokens:#?}");
 
-    let ast = parser::parse(tokens);
+    let ast = parser::parse(tokens, Some(scope));
     // println!("{ast:#?}");
 
     match ast {
         Ok(ast) => {
-            let res = interperter::interpert(ast, env, scope);
+            let res = interperter::interpert(ast, env);
             println!("{res:#?}");
         }
         Err(err) => println!("Error while parsing AST: {err:#?}"),

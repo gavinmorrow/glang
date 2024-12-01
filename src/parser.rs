@@ -1,26 +1,29 @@
 use crate::{
     ast::{
         BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Pattern,
-        Program, Stmt, UnaryExpr, UnaryOp,
+        Program, Scope, Stmt, UnaryExpr, UnaryOp,
     },
     lexer::{Pos, Token, TokenData},
     stream::Stream,
 };
 
-pub fn parse(tokens: Vec<Token>) -> Parse<Program> {
-    Parser::new(tokens).parse_program()
+pub fn parse(tokens: Vec<Token>, parent_scope: Option<Scope>) -> Parse<Program> {
+    Parser::new(tokens, parent_scope).parse_program()
 }
 
 pub type Parse<T> = Result<T, Error>;
 
 struct Parser {
     tokens: Stream<Token>,
+    scope: Scope,
 }
 
 impl Parser {
-    fn new(tokens: Vec<Token>) -> Self {
+    fn new(tokens: Vec<Token>, parent_scope: Option<Scope>) -> Self {
+        let scope = parent_scope.unwrap_or(Scope::new()).nest();
         Parser {
             tokens: Stream::new(tokens),
+            scope,
         }
     }
 }
@@ -63,6 +66,11 @@ impl Parser {
 
     fn parse_binding(&mut self) -> Parse<Binding> {
         let pattern = self.parse_pattern()?;
+
+        // In case of a function, create a new scope
+        // Do it for variables too, bc it shouldn't matter
+        self.scope = self.scope.nest();
+
         let arguments = if self.matches(&TokenData::OpenParen) {
             Some(self.parse_arguments(Self::parse_pattern)?)
         } else {
@@ -71,6 +79,9 @@ impl Parser {
 
         self.expect(TokenData::Equals)?;
         let value = self.parse_expr()?;
+
+        // Exit out of the scope
+        self.scope = *self.scope.parent.clone().expect("binding has parent scope");
 
         Ok(Binding {
             pattern,
@@ -209,6 +220,7 @@ impl Parser {
             let if_expr = self.parse_if_expr()?;
             Ok(Expr::If(Box::new(if_expr)))
         } else {
+            let scope = self.scope.clone();
             self.consume_map(
                 |t| match &t.data {
                     TokenData::True => Some(Literal(Bool(true))),
@@ -216,9 +228,10 @@ impl Parser {
                     TokenData::Number(n) => Some(Literal(Number(*n))),
                     TokenData::Str(s) => Some(Literal(Str(s.clone()))),
                     TokenData::Nil => Some(Literal(Nil)),
-                    TokenData::Identifier(name) => {
-                        Some(Expr::Identifier(Identifier { name: name.clone() }))
-                    }
+                    TokenData::Identifier(name) => Some(Expr::Identifier(Identifier::new(
+                        scope.clone(),
+                        name.clone(),
+                    ))),
                     _ => None,
                 },
                 ErrorKind::ExpectedPrimary,
@@ -227,6 +240,8 @@ impl Parser {
     }
 
     fn parse_block(&mut self) -> Parse<Block> {
+        self.scope = self.scope.nest();
+
         let mut stmts = vec![];
         let mut expr = None;
         while !self.matches(&TokenData::CloseBrace) {
@@ -240,6 +255,9 @@ impl Parser {
                 }
             }
         }
+
+        // we just nested the scope, so unnest it now
+        self.scope = *self.scope.parent.clone().expect("block has parent scope");
 
         Ok(Block(stmts, expr))
     }
@@ -275,7 +293,7 @@ impl Parser {
             },
             ErrorKind::ExpectedIdentifier,
         )?;
-        Ok(Identifier { name })
+        Ok(Identifier::new(self.scope.clone(), name))
     }
 }
 
