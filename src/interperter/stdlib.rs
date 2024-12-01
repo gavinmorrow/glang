@@ -81,7 +81,7 @@ fn list(arguments: Vec<Value>) -> super::Result<Value> {
 fn list_get(arguments: Vec<Value>) -> super::Result<Value> {
     let list = arguments.first().unwrap().as_list()?;
     let index = arguments.get(1).unwrap().as_num()? as usize;
-    Ok(list.get(index).unwrap().clone())
+    Ok(list.get(index).cloned().unwrap_or(Value::Nil))
 }
 
 fn list_set(arguments: Vec<Value>) -> super::Result<Value> {
