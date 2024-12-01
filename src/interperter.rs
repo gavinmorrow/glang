@@ -244,7 +244,7 @@ impl Value {
         !self.is_falsy()
     }
     fn is_falsy(&self) -> bool {
-        matches!(self, Value::Bool(false))
+        matches!(self, Value::Bool(false) | Value::Nil)
     }
 
     fn as_num(&self) -> Result<f64> {
