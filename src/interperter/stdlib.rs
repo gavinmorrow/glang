@@ -37,6 +37,7 @@ fn define_stdlib(env: &mut Environment, scope: Scope) {
 
     native_func!(PrintFunc, print);
     native_func!(InputFunc, input);
+    native_func!(NumFromStrFunc, num_from_str);
     native_func!(ListFunc, list);
     native_func!(ListGetFunc, list_get);
     native_func!(ListSetFunc, list_set);
@@ -73,6 +74,14 @@ fn input(arguments: Vec<Value>) -> super::Result<Value> {
         .map_err(|err| Error::new(ErrorKind::IOError(err)))?;
     input.pop().expect("trailing newline should be removed");
     Ok(Value::Str(input))
+}
+
+fn num_from_str(arguments: Vec<Value>) -> super::Result<Value> {
+    let str = arguments.first().unwrap().as_str()?;
+    match str.parse() {
+        Ok(num) => Ok(Value::Num(num)),
+        Err(_) => Ok(Value::Nil),
+    }
 }
 
 fn list(arguments: Vec<Value>) -> super::Result<Value> {
