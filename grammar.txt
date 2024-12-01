@@ -12,7 +12,7 @@ pattern        -> IDENTIFIER
 
 expression     -> logic_or
 
-block          -> "{" statement* "}"
+block          -> "{" statement* expression? "}"
                 | if_expr
 
 if_expr        -> "if" expression block ( "else" (if_expr | block) )?

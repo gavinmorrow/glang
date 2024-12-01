@@ -1,4 +1,4 @@
-use std::io;
+use std::{fs, io};
 
 use interperter::env::{Environment, Scope};
 
@@ -9,6 +9,19 @@ mod parser;
 mod stream;
 
 fn main() {
+    let mut args = std::env::args();
+
+    let _ = args.next();
+    if let Some(path) = args.next() {
+        let source = fs::read_to_string(path).expect("source file is readable");
+        let (mut env, scope) = Environment::new_root();
+        run(source, &mut env, scope);
+    } else {
+        run_repl();
+    }
+}
+
+fn run_repl() {
     // start repl
     let (mut env, scope) = Environment::new_root();
 

@@ -78,7 +78,10 @@ impl Evaluate for Block {
             stmt.evaluate(env, scope.clone())?;
         }
 
-        Ok(Value::Void)
+        self.1
+            .as_ref()
+            .map(|e| e.evaluate(env, scope))
+            .unwrap_or(Ok(Value::Void))
     }
 }
 
@@ -302,6 +305,11 @@ pub enum ErrorKind {
     },
     VariableNotDefinied {
         name: String,
+    },
+    IOError(std::io::Error),
+    IncorrectArity {
+        given: usize,
+        correct: usize,
     },
 }
 

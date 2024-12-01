@@ -27,7 +27,7 @@ pub enum Expr {
 }
 
 #[derive(Clone, Debug)]
-pub struct Block(pub Vec<Stmt>);
+pub struct Block(pub Vec<Stmt>, pub Option<Box<Expr>>);
 
 #[derive(Clone, Debug)]
 pub struct Call {

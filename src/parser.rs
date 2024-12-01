@@ -36,14 +36,28 @@ impl Parser {
     }
 
     fn parse_stmt(&mut self) -> Parse<Stmt> {
+        match self.parse_stmt_or_expr()? {
+            StmtOrExpr::Stmt(stmt) => Ok(stmt),
+            StmtOrExpr::Expr(_) => Err(Error {
+                pos: self.tokens.peek().map(|t| t.pos),
+                kind: ErrorKind::ExpectedStmt,
+            }),
+        }
+    }
+
+    // This is done weirdly to allow for blocks to end in an expr easily
+    fn parse_stmt_or_expr(&mut self) -> Parse<StmtOrExpr> {
         if self.matches(&TokenData::Let) {
             let binding = self.parse_binding()?;
             self.expect(TokenData::Semicolon)?;
-            Ok(Stmt::Let(binding))
+            Ok(StmtOrExpr::Stmt(Stmt::Let(binding)))
         } else {
             let expr = self.parse_expr()?;
-            self.expect(TokenData::Semicolon)?;
-            Ok(Stmt::Expr(expr))
+            if self.expect(TokenData::Semicolon).is_ok() {
+                Ok(StmtOrExpr::Stmt(Stmt::Expr(expr)))
+            } else {
+                Ok(StmtOrExpr::Expr(expr))
+            }
         }
     }
 
@@ -213,12 +227,20 @@ impl Parser {
 
     fn parse_block(&mut self) -> Parse<Block> {
         let mut stmts = vec![];
+        let mut expr = None;
         while !self.matches(&TokenData::CloseBrace) {
-            let stmt = self.parse_stmt()?;
-            stmts.push(stmt);
+            let stmt_or_expr = self.parse_stmt_or_expr()?;
+            match stmt_or_expr {
+                StmtOrExpr::Stmt(stmt) => stmts.push(stmt),
+                StmtOrExpr::Expr(e) => {
+                    expr = Some(Box::new(e));
+                    self.expect(TokenData::CloseBrace)?;
+                    break;
+                }
+            }
         }
 
-        Ok(Block(stmts))
+        Ok(Block(stmts, expr))
     }
 
     fn parse_if_expr(&mut self) -> Parse<IfExpr> {
@@ -280,6 +302,12 @@ impl Parser {
     }
 }
 
+#[derive(Clone, Debug)]
+enum StmtOrExpr {
+    Stmt(Stmt),
+    Expr(Expr),
+}
+
 #[expect(dead_code, reason = "Pretty error printing not implemented yet")]
 #[derive(Debug)]
 pub struct Error {
@@ -297,4 +325,5 @@ pub enum ErrorKind {
     ExpectedIdentifier,
     ExpectedPrimary,
     ExpectedUnary,
+    ExpectedStmt,
 }
