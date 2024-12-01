@@ -89,6 +89,7 @@ pub enum Literal {
     Bool(bool),
     Number(f64),
     Str(String),
+    Nil,
 }
 
 #[derive(Clone, Debug)]

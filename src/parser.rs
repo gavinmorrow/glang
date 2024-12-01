@@ -200,7 +200,7 @@ impl Parser {
     }
 
     fn parse_primary(&mut self) -> Parse<Expr> {
-        use crate::ast::Literal::{Bool, Number, Str};
+        use crate::ast::Literal::{Bool, Nil, Number, Str};
         use Expr::Literal;
         if self.matches(&TokenData::OpenBrace) {
             let block = self.parse_block()?;
@@ -215,6 +215,7 @@ impl Parser {
                     TokenData::False => Some(Literal(Bool(false))),
                     TokenData::Number(n) => Some(Literal(Number(*n))),
                     TokenData::Str(s) => Some(Literal(Str(s.clone()))),
+                    TokenData::Nil => Some(Literal(Nil)),
                     TokenData::Identifier(name) => {
                         Some(Expr::Identifier(Identifier { name: name.clone() }))
                     }

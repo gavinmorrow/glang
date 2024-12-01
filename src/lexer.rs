@@ -81,6 +81,7 @@ pub fn lex(source: String) -> Vec<Token> {
                     "and" => And,
                     "true" => True,
                     "false" => False,
+                    "nil" => Nil,
                     _ => Identifier(ident),
                 }
             }
@@ -140,6 +141,7 @@ pub enum TokenData {
     Star,
     True,
     False,
+    Nil,
     Number(f64),
     Str(String),
     Identifier(String),

@@ -25,7 +25,7 @@ impl Evaluate for Program {
         for stmt in self {
             stmt.evaluate(env, scope.clone())?;
         }
-        Ok(Value::Void)
+        Ok(Value::Nil)
     }
 }
 
@@ -54,7 +54,7 @@ impl Evaluate for Binding {
             None => self.value.evaluate(env, scope)?,
         };
         env.define(identifier, value);
-        Ok(Value::Void)
+        Ok(Value::Nil)
     }
 }
 
@@ -81,7 +81,7 @@ impl Evaluate for Block {
         self.1
             .as_ref()
             .map(|e| e.evaluate(env, scope))
-            .unwrap_or(Ok(Value::Void))
+            .unwrap_or(Ok(Value::Nil))
     }
 }
 
@@ -135,7 +135,7 @@ impl Evaluate for IfExpr {
             match &self.else_block {
                 Some(ElseBlock::Else(else_block)) => Ok(else_block.evaluate(env, scope)?),
                 Some(ElseBlock::ElseIf(if_expr)) => Ok(if_expr.evaluate(env, scope)?),
-                None => Ok(Value::Void),
+                None => Ok(Value::Nil),
             }
         }
     }
@@ -212,6 +212,7 @@ impl Evaluate for Literal {
             Literal::Bool(b) => Value::Bool(*b),
             Literal::Number(n) => Value::Num(*n),
             Literal::Str(s) => Value::Str(s.clone()),
+            Literal::Nil => Value::Nil,
         })
     }
 }
@@ -235,7 +236,7 @@ pub enum Value {
     Str(String),
     Func(Func),
     List(Vec<Value>),
-    Void,
+    Nil,
 }
 
 impl Value {
@@ -331,7 +332,7 @@ pub enum DiagnosticType {
     Str,
     Func,
     List,
-    Void,
+    Nil,
 }
 impl From<&Value> for DiagnosticType {
     fn from(value: &Value) -> Self {
@@ -341,7 +342,7 @@ impl From<&Value> for DiagnosticType {
             Value::Str(_) => Self::Str,
             Value::Func(_) => Self::Func,
             Value::List(_) => Self::List,
-            Value::Void => Self::Void,
+            Value::Nil => Self::Nil,
         }
     }
 }

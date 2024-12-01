@@ -51,7 +51,7 @@ fn print(arguments: Vec<Value>) -> super::Result<Value> {
     for arg in arguments {
         println!("{arg:#?}");
     }
-    Ok(Value::Void)
+    Ok(Value::Nil)
 }
 
 fn input(arguments: Vec<Value>) -> super::Result<Value> {
