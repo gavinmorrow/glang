@@ -1,5 +1,7 @@
 pub mod env;
 
+use std::iter::zip;
+
 use env::{Environment, Scope};
 
 use crate::ast::{
@@ -81,7 +83,30 @@ impl Evaluate for Block {
 
 impl Evaluate for Call {
     fn evaluate(&self, env: &mut Environment, scope: Scope) -> Result<Value> {
-        todo!("calling functions")
+        let func = self.target.evaluate(env, scope.clone())?;
+        let Value::Func(func) = func else {
+            return Err(Error::new(ErrorKind::TypeError {
+                expected: DiagnosticType::Func,
+                actual: func.into(),
+            }));
+        };
+
+        // Create new scope for function
+        let func_scope = scope.nest();
+
+        // Initialize arguments as values in that scope
+        for (pattern, value) in zip(func.arguments, &self.arguments) {
+            let name = pattern.0.name.clone();
+            let identifier = env::Identifier::new(func_scope.clone(), name);
+
+            // Evaluate values in outer scope, to prevent them from using
+            // previously defined arguments (that would be really confusing)
+            let value = value.evaluate(env, scope.clone())?;
+            env.define(identifier, value);
+        }
+
+        // Evaluate function body
+        func.body.evaluate(env, func_scope)
     }
 }
 
@@ -139,13 +164,13 @@ impl Evaluate for BinaryExpr {
                 (Num(_), b) | (Str(_), b) => {
                     return Err(Error::new(ErrorKind::TypeError {
                         expected: DiagnosticType::Num,
-                        actual: (&b).into(),
+                        actual: b.into(),
                     }))
                 }
                 (a, _) => {
                     return Err(Error::new(ErrorKind::TypeError {
                         expected: DiagnosticType::Num,
-                        actual: (&a).into(),
+                        actual: a.into(),
                     }))
                 }
             },
@@ -282,5 +307,10 @@ impl From<&Value> for DiagnosticType {
             Value::Func(_) => Self::Func,
             Value::Void => Self::Void,
         }
+    }
+}
+impl From<Value> for DiagnosticType {
+    fn from(value: Value) -> Self {
+        Self::from(&value)
     }
 }
