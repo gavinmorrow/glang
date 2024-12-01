@@ -252,6 +252,16 @@ impl Value {
         }
     }
 
+    fn as_str(&self) -> Result<String> {
+        match self {
+            Self::Str(s) => Ok(s.clone()),
+            _ => Err(Error::new(ErrorKind::TypeError {
+                expected: DiagnosticType::Str,
+                actual: DiagnosticType::from(self),
+            })),
+        }
+    }
+
     fn as_list(&self) -> Result<Vec<Value>> {
         match self {
             Self::List(l) => Ok(l.clone()),

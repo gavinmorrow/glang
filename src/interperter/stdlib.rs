@@ -41,6 +41,8 @@ fn define_stdlib(env: &mut Environment, scope: Scope) {
     native_func!(ListGetFunc, list_get);
     native_func!(ListSetFunc, list_set);
     native_func!(ListPushFunc, list_push);
+    native_func!(StrToCharsFunc, str_to_chars);
+    native_func!(StrFromCharsFunc, str_from_chars);
 }
 
 fn print(arguments: Vec<Value>) -> super::Result<Value> {
@@ -93,4 +95,34 @@ fn list_push(arguments: Vec<Value>) -> super::Result<Value> {
     let value = arguments.get(1).unwrap().clone();
     list.push(value);
     Ok(Value::List(list))
+}
+
+fn str_to_chars(arguments: Vec<Value>) -> super::Result<Value> {
+    let str = arguments.first().unwrap().as_str()?;
+    let chars: Vec<_> = str.chars().map(|c| Value::Str(c.into())).collect();
+    Ok(Value::List(chars))
+}
+
+fn str_from_chars(arguments: Vec<Value>) -> super::Result<Value> {
+    let chars = arguments.first().unwrap().as_list()?;
+    let str: Option<Vec<_>> = chars
+        .into_iter()
+        .map(|v| match v {
+            Value::Str(s) => {
+                let chars: Vec<_> = s.chars().collect();
+                if chars.len() == 1 {
+                    Some(chars[0])
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        })
+        .collect();
+    if let Some(str) = str {
+        let str = String::from_iter(str);
+        Ok(Value::Str(str))
+    } else {
+        Ok(Value::Nil)
+    }
 }
