@@ -41,9 +41,11 @@ fn define_stdlib(env: &mut Environment, scope: Scope) {
     native_func!(ListGetFunc, list_get);
     native_func!(ListSetFunc, list_set);
     native_func!(ListPushFunc, list_push);
+    native_func!(ListLenFunc, list_len);
     native_func!(StrToCharsFunc, str_to_chars);
     native_func!(StrFromCharsFunc, str_from_chars);
     native_func!(ReadFileFunc, read_file);
+    native_func!(ReadFileLinesFunc, read_file_lines);
 }
 
 fn print(arguments: Vec<Value>) -> super::Result<Value> {
@@ -98,6 +100,11 @@ fn list_push(arguments: Vec<Value>) -> super::Result<Value> {
     Ok(Value::List(list))
 }
 
+fn list_len(arguments: Vec<Value>) -> super::Result<Value> {
+    let list = arguments.first().unwrap().as_list()?;
+    Ok(Value::Num(list.len() as f64))
+}
+
 fn str_to_chars(arguments: Vec<Value>) -> super::Result<Value> {
     let str = arguments.first().unwrap().as_str()?;
     let chars: Vec<_> = str.chars().map(|c| Value::Str(c.into())).collect();
@@ -134,4 +141,16 @@ fn read_file(arguments: Vec<Value>) -> super::Result<Value> {
         return Ok(Value::Nil);
     };
     Ok(Value::Str(contents))
+}
+
+// To get around stack overflow w/ split by \n
+fn read_file_lines(arguments: Vec<Value>) -> super::Result<Value> {
+    let Value::Str(contents) = read_file(arguments)? else {
+        return Ok(Value::Nil);
+    };
+    let lines = contents
+        .lines()
+        .map(|l| Value::Str(l.to_string()))
+        .collect();
+    Ok(Value::List(lines))
 }
