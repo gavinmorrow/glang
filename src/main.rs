@@ -1,5 +1,3 @@
-#![expect(dead_code, reason = "prototyping")]
-
 use std::io;
 
 use interperter::env::{Environment, Scope};

@@ -280,11 +280,13 @@ impl Parser {
     }
 }
 
+#[expect(dead_code, reason = "Pretty error printing not implemented yet")]
 #[derive(Debug)]
 pub struct Error {
     pos: Option<Pos>,
     kind: ErrorKind,
 }
+#[expect(dead_code, reason = "Pretty error printing not implemented yet")]
 #[allow(
     clippy::enum_variant_names,
     reason = "Not repeating the enum name, and adds important context."
@@ -295,10 +297,4 @@ pub enum ErrorKind {
     ExpectedIdentifier,
     ExpectedPrimary,
     ExpectedUnary,
-}
-
-impl Stream<Token> {
-    fn advance_if_token(&mut self, expected_type: TokenData) -> bool {
-        self.advance_if(|t| t.data == expected_type)
-    }
 }

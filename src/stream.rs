@@ -54,18 +54,6 @@ impl<T: Clone> Stream<T> {
     }
 }
 
-impl<T: Clone + PartialEq> Stream<T> {
-    pub fn next_if_eq(&mut self, expected: &T) -> Option<T> {
-        self.next_if(|actual| actual == expected)
-    }
-}
-
-impl<T: PartialEq> Stream<T> {
-    pub fn advance_if_eq(&mut self, expected: &T) -> bool {
-        self.advance_if(|actual| actual == expected)
-    }
-}
-
 impl<T> Stream<T> {
     pub fn advance(&mut self) -> Option<usize> {
         if self.pointer_to_next >= self.data.len() {

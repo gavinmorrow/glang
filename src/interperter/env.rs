@@ -44,6 +44,10 @@ impl Environment {
             .and_then(|identifier| self.values.get_mut(&identifier))
     }
 
+    #[expect(
+        dead_code,
+        reason = "Setters aren't a thing, but might be in the future"
+    )]
     /// Update a value if it exists.
     ///
     /// Returns `Ok(())` if the value exists and was updated, and `Err(())`

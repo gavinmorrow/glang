@@ -251,16 +251,6 @@ impl Value {
             })),
         }
     }
-
-    fn as_str(&self) -> Result<String> {
-        match self {
-            Self::Str(s) => Ok(s.clone()),
-            _ => Err(Error::new(ErrorKind::TypeError {
-                expected: DiagnosticType::Str,
-                actual: DiagnosticType::from(self),
-            })),
-        }
-    }
 }
 
 impl PartialEq for Value {
@@ -291,6 +281,7 @@ pub trait NativeFunc: std::fmt::Debug {
     fn call(&self, arguments: Vec<Value>) -> Result<Value>;
 }
 
+#[expect(dead_code, reason = "Pretty error printing not implemented yet")]
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
@@ -302,6 +293,7 @@ impl Error {
     }
 }
 
+#[expect(dead_code, reason = "Pretty error printing not implemented yet")]
 #[derive(Debug)]
 pub enum ErrorKind {
     TypeError {
@@ -319,7 +311,6 @@ pub enum DiagnosticType {
     Num,
     Str,
     Func,
-    NativeFunc,
     Void,
 }
 impl From<&Value> for DiagnosticType {
