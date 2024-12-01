@@ -43,6 +43,7 @@ fn define_stdlib(env: &mut Environment, scope: Scope) {
     native_func!(ListPushFunc, list_push);
     native_func!(StrToCharsFunc, str_to_chars);
     native_func!(StrFromCharsFunc, str_from_chars);
+    native_func!(ReadFileFunc, read_file);
 }
 
 fn print(arguments: Vec<Value>) -> super::Result<Value> {
@@ -125,4 +126,12 @@ fn str_from_chars(arguments: Vec<Value>) -> super::Result<Value> {
     } else {
         Ok(Value::Nil)
     }
+}
+
+fn read_file(arguments: Vec<Value>) -> super::Result<Value> {
+    let path = arguments.first().unwrap().as_str()?;
+    let Ok(contents) = std::fs::read_to_string(path) else {
+        return Ok(Value::Nil);
+    };
+    Ok(Value::Str(contents))
 }
