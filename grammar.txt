@@ -50,7 +50,7 @@ let ask_until_correct(acc_times) = {
     if guess == answer {
         acc_times
     } else {
-        ask_until_correct acc_times
+        ask_until_correct(acc_times)
     }
 };
 let guesses_used = ask_until_correct(0);
