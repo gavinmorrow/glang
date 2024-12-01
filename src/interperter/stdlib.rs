@@ -2,7 +2,7 @@ use std::io::Write;
 
 use super::{
     env::{Environment, Identifier, Scope},
-    Error, ErrorKind, Func, NativeFunc, Value,
+    DiagnosticType, Error, ErrorKind, Func, NativeFunc, Value,
 };
 
 impl Environment {
@@ -41,6 +41,9 @@ fn define_stdlib(env: &mut Environment, scope: Scope) {
 
     native_func!(PrintFunc, print);
     native_func!(InputFunc, input);
+    native_func!(ListFunc, list);
+    native_func!(ListGetFunc, list_get);
+    native_func!(ListSetFunc, list_set);
 }
 
 fn print(arguments: Vec<Value>) -> super::Result<Value> {
@@ -68,4 +71,54 @@ fn input(arguments: Vec<Value>) -> super::Result<Value> {
         .map_err(|err| Error::new(ErrorKind::IOError(err)))?;
     input.pop().expect("trailing newline should be removed");
     Ok(Value::Str(input))
+}
+
+fn list(arguments: Vec<Value>) -> super::Result<Value> {
+    Ok(Value::List(arguments))
+}
+
+fn list_get(arguments: Vec<Value>) -> super::Result<Value> {
+    let list = match arguments.first().unwrap() {
+        Value::List(l) => l,
+        x => {
+            return Err(Error::new(ErrorKind::TypeError {
+                expected: DiagnosticType::List,
+                actual: x.into(),
+            }))
+        }
+    };
+    let index = match arguments.get(1).unwrap() {
+        Value::Num(n) => *n as usize,
+        x => {
+            return Err(Error::new(ErrorKind::TypeError {
+                expected: DiagnosticType::Num,
+                actual: x.into(),
+            }))
+        }
+    };
+    Ok(list.get(index).unwrap().clone())
+}
+
+fn list_set(arguments: Vec<Value>) -> super::Result<Value> {
+    let mut list = match arguments.first().unwrap() {
+        Value::List(l) => l.clone(),
+        x => {
+            return Err(Error::new(ErrorKind::TypeError {
+                expected: DiagnosticType::List,
+                actual: x.into(),
+            }))
+        }
+    };
+    let index = match arguments.get(1).unwrap() {
+        Value::Num(n) => *n as usize,
+        x => {
+            return Err(Error::new(ErrorKind::TypeError {
+                expected: DiagnosticType::Num,
+                actual: x.into(),
+            }))
+        }
+    };
+    let new_value = arguments.get(2).unwrap().clone();
+    *list.get_mut(index).unwrap() = new_value;
+    Ok(Value::List(list))
 }

@@ -234,6 +234,7 @@ pub enum Value {
     Num(f64),
     Str(String),
     Func(Func),
+    List(Vec<Value>),
     Void,
 }
 
@@ -319,6 +320,7 @@ pub enum DiagnosticType {
     Num,
     Str,
     Func,
+    List,
     Void,
 }
 impl From<&Value> for DiagnosticType {
@@ -328,6 +330,7 @@ impl From<&Value> for DiagnosticType {
             Value::Num(_) => Self::Num,
             Value::Str(_) => Self::Str,
             Value::Func(_) => Self::Func,
+            Value::List(_) => Self::List,
             Value::Void => Self::Void,
         }
     }
