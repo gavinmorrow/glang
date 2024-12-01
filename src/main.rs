@@ -12,8 +12,7 @@ mod stream;
 
 fn main() {
     // start repl
-    let mut env = Environment::new();
-    let scope = Scope::new();
+    let (mut env, scope) = Environment::new_root();
 
     eprintln!("glang v0.1.0");
     eprint!("> ");

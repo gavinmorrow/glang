@@ -1,4 +1,5 @@
 pub mod env;
+mod stdlib;
 
 use std::iter::zip;
 
@@ -47,7 +48,7 @@ impl Evaluate for Binding {
             Some(arguments) => {
                 let arguments = arguments.clone();
                 let body = self.value.clone();
-                Value::Func(Func { arguments, body })
+                Value::Func(Func::User(UserFunc { arguments, body }))
             }
             // But do for a variable
             None => self.value.evaluate(env, scope)?,
@@ -91,22 +92,34 @@ impl Evaluate for Call {
             }));
         };
 
-        // Create new scope for function
-        let func_scope = scope.nest();
+        match func {
+            Func::User(func) => {
+                // Create new scope for function
+                let func_scope = scope.nest();
 
-        // Initialize arguments as values in that scope
-        for (pattern, value) in zip(func.arguments, &self.arguments) {
-            let name = pattern.0.name.clone();
-            let identifier = env::Identifier::new(func_scope.clone(), name);
+                // Initialize arguments as values in that scope
+                for (pattern, value) in zip(func.arguments, &self.arguments) {
+                    let name = pattern.0.name.clone();
+                    let identifier = env::Identifier::new(func_scope.clone(), name);
 
-            // Evaluate values in outer scope, to prevent them from using
-            // previously defined arguments (that would be really confusing)
-            let value = value.evaluate(env, scope.clone())?;
-            env.define(identifier, value);
+                    // Evaluate values in outer scope, to prevent them from using
+                    // previously defined arguments (that would be really confusing)
+                    let value = value.evaluate(env, scope.clone())?;
+                    env.define(identifier, value);
+                }
+
+                // Evaluate function body
+                func.body.evaluate(env, func_scope)
+            }
+            Func::Native(func) => {
+                let mut arguments = vec![];
+                for argument in &self.arguments {
+                    let argument = argument.evaluate(env, scope.clone())?;
+                    arguments.push(argument);
+                }
+                func.call(arguments)
+            }
         }
-
-        // Evaluate function body
-        func.body.evaluate(env, func_scope)
     }
 }
 
@@ -263,9 +276,19 @@ impl PartialEq for Value {
 }
 
 #[derive(Clone, Debug)]
-pub struct Func {
+pub enum Func {
+    User(UserFunc),
+    Native(&'static dyn NativeFunc),
+}
+
+#[derive(Clone, Debug)]
+pub struct UserFunc {
     arguments: Vec<Pattern>,
     body: Expr,
+}
+
+pub trait NativeFunc: std::fmt::Debug {
+    fn call(&self, arguments: Vec<Value>) -> Result<Value>;
 }
 
 #[derive(Debug)]
@@ -296,6 +319,7 @@ pub enum DiagnosticType {
     Num,
     Str,
     Func,
+    NativeFunc,
     Void,
 }
 impl From<&Value> for DiagnosticType {
