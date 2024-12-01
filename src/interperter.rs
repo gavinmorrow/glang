@@ -255,6 +255,16 @@ impl Value {
             })),
         }
     }
+
+    fn as_list(&self) -> Result<Vec<Value>> {
+        match self {
+            Self::List(l) => Ok(l.clone()),
+            _ => Err(Error::new(ErrorKind::TypeError {
+                expected: DiagnosticType::List,
+                actual: DiagnosticType::from(self),
+            })),
+        }
+    }
 }
 
 impl PartialEq for Value {

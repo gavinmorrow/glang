@@ -2,7 +2,7 @@ use std::io::Write;
 
 use super::{
     env::{Environment, Identifier, Scope},
-    DiagnosticType, Error, ErrorKind, Func, NativeFunc, Value,
+    Error, ErrorKind, Func, NativeFunc, Value,
 };
 
 impl Environment {
@@ -44,6 +44,7 @@ fn define_stdlib(env: &mut Environment, scope: Scope) {
     native_func!(ListFunc, list);
     native_func!(ListGetFunc, list_get);
     native_func!(ListSetFunc, list_set);
+    native_func!(ListPushFunc, list_push);
 }
 
 fn print(arguments: Vec<Value>) -> super::Result<Value> {
@@ -78,47 +79,22 @@ fn list(arguments: Vec<Value>) -> super::Result<Value> {
 }
 
 fn list_get(arguments: Vec<Value>) -> super::Result<Value> {
-    let list = match arguments.first().unwrap() {
-        Value::List(l) => l,
-        x => {
-            return Err(Error::new(ErrorKind::TypeError {
-                expected: DiagnosticType::List,
-                actual: x.into(),
-            }))
-        }
-    };
-    let index = match arguments.get(1).unwrap() {
-        Value::Num(n) => *n as usize,
-        x => {
-            return Err(Error::new(ErrorKind::TypeError {
-                expected: DiagnosticType::Num,
-                actual: x.into(),
-            }))
-        }
-    };
+    let list = arguments.first().unwrap().as_list()?;
+    let index = arguments.get(1).unwrap().as_num()? as usize;
     Ok(list.get(index).unwrap().clone())
 }
 
 fn list_set(arguments: Vec<Value>) -> super::Result<Value> {
-    let mut list = match arguments.first().unwrap() {
-        Value::List(l) => l.clone(),
-        x => {
-            return Err(Error::new(ErrorKind::TypeError {
-                expected: DiagnosticType::List,
-                actual: x.into(),
-            }))
-        }
-    };
-    let index = match arguments.get(1).unwrap() {
-        Value::Num(n) => *n as usize,
-        x => {
-            return Err(Error::new(ErrorKind::TypeError {
-                expected: DiagnosticType::Num,
-                actual: x.into(),
-            }))
-        }
-    };
+    let mut list = arguments.first().unwrap().as_list()?;
+    let index = arguments.get(1).unwrap().as_num()? as usize;
     let new_value = arguments.get(2).unwrap().clone();
     *list.get_mut(index).unwrap() = new_value;
+    Ok(Value::List(list))
+}
+
+fn list_push(arguments: Vec<Value>) -> super::Result<Value> {
+    let mut list = arguments.first().unwrap().as_list()?;
+    let value = arguments.get(1).unwrap().clone();
+    list.push(value);
     Ok(Value::List(list))
 }
