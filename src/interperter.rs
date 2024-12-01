@@ -4,7 +4,7 @@ use env::{Environment, Scope};
 
 use crate::ast::{
     BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Literal,
-    Program, Stmt, UnaryExpr, UnaryOp,
+    Pattern, Program, Stmt, UnaryExpr, UnaryOp,
 };
 
 pub fn interpert(program: Program, env: &mut Environment, scope: Scope) -> Result<Value> {
@@ -37,21 +37,21 @@ impl Evaluate for Stmt {
 
 impl Evaluate for Binding {
     fn evaluate(&self, env: &mut Environment, scope: Scope) -> Result<Value> {
-        match &self.arguments {
+        let name = self.pattern.0.name.clone();
+        let identifier = env::Identifier::new(scope.clone(), name);
+
+        let value = match &self.arguments {
+            // Don't `.evaluate()` anything for a function
             Some(arguments) => {
-                // define a function
-                todo!("defining functions")
+                let arguments = arguments.clone();
+                let body = self.value.clone();
+                Value::Func(Func { arguments, body })
             }
-            None => {
-                // define a variable
-                let name = self.pattern.0.name.clone();
-                let value = self.value.evaluate(env, scope.clone())?;
-
-                env.define(env::Identifier::new(scope, name), value);
-
-                Ok(Value::Void)
-            }
-        }
+            // But do for a variable
+            None => self.value.evaluate(env, scope)?,
+        };
+        env.define(identifier, value);
+        Ok(Value::Void)
     }
 }
 
@@ -187,11 +187,12 @@ impl Evaluate for Identifier {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Value {
     Bool(bool),
     Num(f64),
     Str(String),
+    Func(Func),
     Void,
 }
 
@@ -224,6 +225,24 @@ impl Value {
     }
 }
 
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Bool(l), Self::Bool(r)) => l == r,
+            (Self::Num(l), Self::Num(r)) => l == r,
+            (Self::Str(l), Self::Str(r)) => l == r,
+            (Self::Func(_), Self::Func(_)) => false,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Func {
+    arguments: Vec<Pattern>,
+    body: Expr,
+}
+
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
@@ -251,6 +270,7 @@ pub enum DiagnosticType {
     Bool,
     Num,
     Str,
+    Func,
     Void,
 }
 impl From<&Value> for DiagnosticType {
@@ -259,6 +279,7 @@ impl From<&Value> for DiagnosticType {
             Value::Bool(_) => Self::Bool,
             Value::Num(_) => Self::Num,
             Value::Str(_) => Self::Str,
+            Value::Func(_) => Self::Func,
             Value::Void => Self::Void,
         }
     }
