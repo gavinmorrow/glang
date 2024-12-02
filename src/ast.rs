@@ -104,13 +104,10 @@ impl Identifier {
         Self { scope, name }
     }
 
-    pub fn in_parent_scope(&mut self) -> Option<Self> {
-        self.scope.parent.clone().map(|parent_scope| {
-            *self = Identifier {
-                scope: *parent_scope,
-                name: self.name.clone(),
-            };
-            self.clone()
+    pub fn in_parent_scope(&self) -> Option<Self> {
+        self.scope.parent.clone().map(|parent_scope| Identifier {
+            scope: *parent_scope,
+            name: self.name.clone(),
         })
     }
 }

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{
     ast::{
         BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Pattern,
@@ -15,7 +17,16 @@ pub type Parse<T> = Result<T, Error>;
 
 struct Parser {
     tokens: Stream<Token>,
+
+    /// The lexical scope that the parser is currently at. This should be
+    /// nested at the start of e.g. parse_block() to create a new scope,
+    /// and then unnested at the end to reset it. When a variable is created,
+    /// it should use the current scope.
     scope: Scope,
+    /// A list of all the variables created in parsing up to the current point.
+    /// This should be added to whenever a new variable is created, and
+    /// referenced whenever a variable is used.
+    vars: HashSet<Identifier>,
 }
 
 impl Parser {
@@ -24,6 +35,33 @@ impl Parser {
         Parser {
             tokens: Stream::new(tokens),
             scope,
+            vars: HashSet::new(),
+        }
+    }
+
+    fn nest_scope(&mut self) {
+        self.scope = self.scope.nest();
+    }
+
+    /// # Panics
+    ///
+    /// Panics if there is no parent scope to unnest into.
+    fn unnest_scope(&mut self) {
+        self.scope = *self.scope.parent.clone().unwrap();
+    }
+
+    fn resolve_scope_of(&self, identifier: &Identifier) -> Option<Identifier> {
+        if self.vars.contains(identifier) {
+            Some(identifier.clone())
+        } else {
+            let mut identifier = identifier.clone();
+            while let Some(parent) = identifier.in_parent_scope() {
+                if self.vars.contains(&parent) {
+                    return Some(parent);
+                }
+                identifier = parent;
+            }
+            None
         }
     }
 }
@@ -69,7 +107,7 @@ impl Parser {
 
         // In case of a function, create a new scope
         // Do it for variables too, bc it shouldn't matter
-        self.scope = self.scope.nest();
+        self.nest_scope();
 
         let arguments = if self.matches(&TokenData::OpenParen) {
             Some(self.parse_arguments(Self::parse_pattern)?)
@@ -81,7 +119,7 @@ impl Parser {
         let value = self.parse_expr()?;
 
         // Exit out of the scope
-        self.scope = *self.scope.parent.clone().expect("binding has parent scope");
+        self.unnest_scope();
 
         Ok(Binding {
             pattern,
@@ -92,6 +130,7 @@ impl Parser {
 
     fn parse_pattern(&mut self) -> Parse<Pattern> {
         let identifier = self.parse_identifier()?;
+        self.vars.insert(identifier.clone());
         Ok(Pattern(identifier))
     }
 
@@ -236,6 +275,26 @@ impl Parser {
                 },
                 ErrorKind::ExpectedPrimary,
             )
+            // Resolve variable
+            .and_then(|expr| match expr {
+                Expr::Identifier(identifier) => match self.resolve_scope_of(&identifier) {
+                    Some(identifier) => Ok(Expr::Identifier(identifier)),
+                    None => Err(Error {
+                        pos: Some(
+                            self.tokens
+                                .peek_current()
+                                // Use expect and also wrap in Some b/c it is
+                                // def a very bad error if it is None.
+                                .expect("just consumed token exists")
+                                .pos,
+                        ),
+                        kind: ErrorKind::VarNotInScope {
+                            name: identifier.name,
+                        },
+                    }),
+                },
+                expr => Ok(expr),
+            })
         }
     }
 
@@ -345,4 +404,5 @@ pub enum ErrorKind {
     ExpectedPrimary,
     ExpectedUnary,
     ExpectedStmt,
+    VarNotInScope { name: String },
 }

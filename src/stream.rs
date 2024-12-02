@@ -102,4 +102,8 @@ impl<T> Stream<T> {
 
         num_advanced
     }
+
+    pub fn peek_current(&self) -> Option<&T> {
+        self.data.get(self.pointer_to_next.checked_sub(1)?)
+    }
 }
