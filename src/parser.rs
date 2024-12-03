@@ -10,8 +10,13 @@ use crate::{
     stream::Stream,
 };
 
-pub fn parse(tokens: Vec<Token>, parent_scope: Option<Scope>) -> Parse<Program> {
-    Parser::new(tokens, parent_scope).parse_program()
+/// A ancestor of `parent_scope` must include the stdlib.
+pub fn parse(
+    tokens: Vec<Token>,
+    parent_scope: Option<Scope>,
+    stdlib_scope: Scope,
+) -> Parse<Program> {
+    Parser::new(tokens, parent_scope, stdlib_scope).parse_program()
 }
 
 pub type Parse<T> = Result<T, Error>;
@@ -31,13 +36,15 @@ struct Parser {
 }
 
 impl Parser {
-    fn new(tokens: Vec<Token>, parent_scope: Option<Scope>) -> Self {
-        let scope = parent_scope.map(|p| p.nest()).unwrap_or(Scope::new());
+    /// A ancestor of `parent_scope` must include the stdlib.
+    fn new(tokens: Vec<Token>, scope: Option<Scope>, stdlib_scope: Scope) -> Self {
+        let scope = scope.unwrap_or_else(|| {
+            // nest stdlib to insulate it
+            stdlib_scope.nest()
+        });
 
         let mut vars = HashSet::new();
-        interperter::stub_stdlib(&mut vars, scope.clone());
-        // provide insulation to stdlib vars
-        let scope = scope.nest();
+        interperter::stub_stdlib(&mut vars, stdlib_scope.clone());
 
         Parser {
             tokens: Stream::new(tokens),
