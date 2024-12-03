@@ -5,6 +5,7 @@ use crate::{
         BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Pattern,
         Program, Scope, Stmt, UnaryExpr, UnaryOp,
     },
+    interperter,
     lexer::{Pos, Token, TokenData},
     stream::Stream,
 };
@@ -31,11 +32,17 @@ struct Parser {
 
 impl Parser {
     fn new(tokens: Vec<Token>, parent_scope: Option<Scope>) -> Self {
-        let scope = parent_scope.unwrap_or(Scope::new()).nest();
+        let scope = parent_scope.map(|p| p.nest()).unwrap_or(Scope::new());
+
+        let mut vars = HashSet::new();
+        interperter::stub_stdlib(&mut vars, scope.clone());
+        // provide insulation to stdlib vars
+        let scope = scope.nest();
+
         Parser {
             tokens: Stream::new(tokens),
             scope,
-            vars: HashSet::new(),
+            vars,
         }
     }
 
@@ -277,22 +284,22 @@ impl Parser {
             )
             // Resolve variable
             .and_then(|expr| match expr {
-                Expr::Identifier(identifier) => match self.resolve_scope_of(&identifier) {
-                    Some(identifier) => Ok(Expr::Identifier(identifier)),
-                    None => Err(Error {
-                        pos: Some(
-                            self.tokens
-                                .peek_current()
-                                // Use expect and also wrap in Some b/c it is
-                                // def a very bad error if it is None.
-                                .expect("just consumed token exists")
-                                .pos,
-                        ),
-                        kind: ErrorKind::VarNotInScope {
-                            name: identifier.name,
-                        },
-                    }),
-                },
+                Expr::Identifier(identifier) => {
+                    match self.resolve_scope_of(&identifier) {
+                        Some(identifier) => Ok(Expr::Identifier(identifier)),
+                        None => Err(Error {
+                            pos: Some(
+                                self.tokens
+                                    .peek_current()
+                                    // Use expect and also wrap in Some b/c it is
+                                    // def a very bad error if it is None.
+                                    .expect("just consumed token exists")
+                                    .pos,
+                            ),
+                            kind: ErrorKind::VarNotInScope { identifier },
+                        }),
+                    }
+                }
                 expr => Ok(expr),
             })
         }
@@ -404,5 +411,5 @@ pub enum ErrorKind {
     ExpectedPrimary,
     ExpectedUnary,
     ExpectedStmt,
-    VarNotInScope { name: String },
+    VarNotInScope { identifier: Identifier },
 }

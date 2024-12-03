@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{collections::HashSet, io::Write};
 
 use crate::ast::{Identifier, Scope};
 
@@ -13,6 +13,36 @@ impl Environment {
 
         (root, root_scope)
     }
+}
+
+pub fn stub_stdlib(vars: &mut HashSet<Identifier>, scope: Scope) {
+    macro_rules! stub {
+        ($func:ident) => {
+            vars.insert(Identifier {
+                scope: scope.clone(),
+                name: stringify!($func).to_string(),
+            });
+        };
+        ($func:ident, $($funcs:ident),+) => {
+            stub!($func);
+            stub!($($funcs),+);
+        };
+    }
+
+    stub!(
+        print,
+        input,
+        num_from_str,
+        list,
+        list_get,
+        list_set,
+        list_push,
+        list_len,
+        str_to_chars,
+        str_from_chars,
+        read_file,
+        read_file_lines
+    );
 }
 
 fn define_stdlib(env: &mut Environment, scope: Scope) {

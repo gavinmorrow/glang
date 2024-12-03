@@ -1,6 +1,8 @@
 pub mod env;
 mod stdlib;
 
+pub use stdlib::stub_stdlib;
+
 use std::iter::zip;
 
 use env::Environment;
@@ -214,13 +216,10 @@ impl Evaluate for Literal {
 
 impl Evaluate for Identifier {
     fn evaluate(&self, env: &mut Environment) -> Result<Value> {
-        env.get(self)
-            .ok_or_else(|| {
-                Error::new(ErrorKind::VariableNotDefinied {
-                    name: self.name.clone(),
-                })
-            })
-            .cloned()
+        Ok(env
+            .get(self)
+            .expect("vars should be checked during parsing")
+            .clone())
     }
 }
 
@@ -319,9 +318,6 @@ pub enum ErrorKind {
     TypeError {
         expected: DiagnosticType,
         actual: DiagnosticType,
-    },
-    VariableNotDefinied {
-        name: String,
     },
     IOError(std::io::Error),
     IncorrectArity {
