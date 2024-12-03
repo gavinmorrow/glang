@@ -276,7 +276,9 @@ impl PartialEq for Value {
             (Self::Num(l), Self::Num(r)) => l == r,
             (Self::Str(l), Self::Str(r)) => l == r,
             (Self::Func(_), Self::Func(_)) => false,
-            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+            (Self::List(l), Self::List(r)) => l == r,
+            (Self::Nil, Self::Nil) => true,
+            _ => false,
         }
     }
 }
