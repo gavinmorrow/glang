@@ -134,12 +134,18 @@ impl Parser {
         };
 
         self.expect(TokenData::Equals)?;
-        let value = self.parse_expr()?;
 
-        // Define the variable in env
-        // Do *not* do this before evaluating the rhs, or it can cause a
-        // recursive definition -> the interperter to crashes w/ var not defined
-        self.vars.insert(pattern.0.clone());
+        let is_func = arguments.is_some();
+        let value = if is_func {
+            // Insert the var *before* so that the function can be recursive
+            self.vars.insert(pattern.0.clone());
+            self.parse_expr()?
+        } else {
+            // Insert the var *after* so that variable shadowing works
+            self.parse_expr().inspect(|_| {
+                self.vars.insert(pattern.0.clone());
+            })?
+        };
 
         // Exit out of the scope
         self.unnest_scope();
