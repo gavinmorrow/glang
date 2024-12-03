@@ -124,13 +124,22 @@ impl Parser {
         self.nest_scope();
 
         let arguments = if self.matches(&TokenData::OpenParen) {
-            Some(self.parse_arguments(Self::parse_pattern)?)
+            Some(self.parse_arguments(|parser| -> Parse<Pattern> {
+                let pattern = parser.parse_pattern()?;
+                parser.vars.insert(pattern.0.clone());
+                Ok(pattern)
+            })?)
         } else {
             None
         };
 
         self.expect(TokenData::Equals)?;
         let value = self.parse_expr()?;
+
+        // Define the variable in env
+        // Do *not* do this before evaluating the rhs, or it can cause a
+        // recursive definition -> the interperter to crashes w/ var not defined
+        self.vars.insert(pattern.0.clone());
 
         // Exit out of the scope
         self.unnest_scope();
@@ -144,7 +153,6 @@ impl Parser {
 
     fn parse_pattern(&mut self) -> Parse<Pattern> {
         let identifier = self.parse_identifier()?;
-        self.vars.insert(identifier.clone());
         Ok(Pattern(identifier))
     }
 

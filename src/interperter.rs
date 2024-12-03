@@ -98,12 +98,9 @@ impl Evaluate for Call {
 
         match func {
             Func::User(func) => {
-                // Initialize arguments as values in that scope
                 for (pattern, value) in zip(func.arguments, &self.arguments) {
                     let identifier = pattern.0.clone();
 
-                    // Evaluate values in outer scope, to prevent them from using
-                    // previously defined arguments (that would be really confusing)
                     let value = value.evaluate(env)?;
                     env.define(identifier, value);
                 }
@@ -218,7 +215,7 @@ impl Evaluate for Identifier {
     fn evaluate(&self, env: &mut Environment) -> Result<Value> {
         Ok(env
             .get(self)
-            .expect("vars should be checked during parsing")
+            .unwrap_or_else(|| panic!("Variable not defined!! {self:#?}"))
             .clone())
     }
 }
