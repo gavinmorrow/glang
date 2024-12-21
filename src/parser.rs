@@ -1,11 +1,8 @@
-use std::collections::HashSet;
-
 use crate::{
     ast::{
         BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Pattern,
         Program, Stmt, UnaryExpr, UnaryOp,
     },
-    interperter,
     lexer::{Pos, Token, TokenData},
     stream::Stream,
 };
@@ -69,10 +66,6 @@ impl Parser {
     fn parse_binding(&mut self) -> Parse<Binding> {
         let pattern = self.parse_pattern()?;
 
-        // In case of a function, create a new scope
-        // Do it for variables too, bc it shouldn't matter
-        todo!("nest scope");
-
         let arguments = if self.matches(&TokenData::OpenParen) {
             Some(self.parse_arguments(|parser| -> Parse<Pattern> {
                 let pattern = parser.parse_pattern()?;
@@ -96,9 +89,6 @@ impl Parser {
                 todo!("define var");
             })?
         };
-
-        // Exit out of the scope
-        todo!("exit scope");
 
         Ok(Binding {
             pattern,
@@ -251,32 +241,10 @@ impl Parser {
                 },
                 ErrorKind::ExpectedPrimary,
             )
-            // Resolve variable
-            .and_then(|expr| match expr {
-                Expr::Identifier(identifier) => {
-                    match todo!("resolve scope") {
-                        Some(identifier) => Ok(Expr::Identifier(identifier)),
-                        None => Err(Error {
-                            pos: Some(
-                                self.tokens
-                                    .peek_current()
-                                    // Use expect and also wrap in Some b/c it is
-                                    // def a very bad error if it is None.
-                                    .expect("just consumed token exists")
-                                    .pos,
-                            ),
-                            kind: ErrorKind::VarNotInScope { identifier },
-                        }),
-                    }
-                }
-                expr => Ok(expr),
-            })
         }
     }
 
     fn parse_block(&mut self) -> Parse<Block> {
-        todo!("nest scope");
-
         let mut stmts = vec![];
         let mut expr = None;
         while !self.matches(&TokenData::CloseBrace) {
@@ -290,9 +258,6 @@ impl Parser {
                 }
             }
         }
-
-        // we just nested the scope, so unnest it now
-        todo!("unnest");
 
         Ok(Block(stmts, expr))
     }
