@@ -1,25 +1,13 @@
 use std::{collections::HashSet, io::Write};
 
-use crate::ast::{Identifier, Scope};
+use crate::ast::Identifier;
 
-use super::{env::Environment, Error, ErrorKind, Func, NativeFunc, Value};
+use super::{Error, ErrorKind, Func, NativeFunc, Value};
 
-impl Environment {
-    pub fn new_root() -> (Self, Scope) {
-        let mut root = Self::new();
-        let root_scope = Scope::new();
-
-        define_stdlib(&mut root, root_scope.clone());
-
-        (root, root_scope)
-    }
-}
-
-pub fn stub_stdlib(vars: &mut HashSet<Identifier>, scope: Scope) {
+pub fn stub_stdlib(vars: &mut HashSet<Identifier>) {
     macro_rules! stub {
         ($func:ident) => {
             vars.insert(Identifier {
-                scope: scope.clone(),
                 name: stringify!($func).to_string(),
             });
         };
@@ -45,15 +33,15 @@ pub fn stub_stdlib(vars: &mut HashSet<Identifier>, scope: Scope) {
     );
 }
 
-fn define_stdlib(env: &mut Environment, scope: Scope) {
+fn define_stdlib() {
     macro_rules! native_func {
         ($struct_name:ident, $func_def:ident) => {
             #[derive(Debug)]
             struct $struct_name;
             impl $struct_name {
-                fn define(env: &mut Environment, scope: Scope) {
-                    let identifier = Identifier::new(scope, stringify!($func_def).to_string());
-                    env.define(identifier, Value::Func(Func::Native(&$struct_name)));
+                fn define() {
+                    let identifier = Identifier::new(stringify!($func_def).to_string());
+                    todo!("define");
                 }
             }
             impl NativeFunc for $struct_name {
@@ -61,7 +49,7 @@ fn define_stdlib(env: &mut Environment, scope: Scope) {
                     $func_def(arguments)
                 }
             }
-            $struct_name::define(env, scope.clone());
+            $struct_name::define();
         };
     }
 

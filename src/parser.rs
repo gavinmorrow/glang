@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::{
     ast::{
         BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Pattern,
-        Program, Scope, Stmt, UnaryExpr, UnaryOp,
+        Program, Stmt, UnaryExpr, UnaryOp,
     },
     interperter,
     lexer::{Pos, Token, TokenData},
@@ -11,71 +11,21 @@ use crate::{
 };
 
 /// A ancestor of `parent_scope` must include the stdlib.
-pub fn parse(
-    tokens: Vec<Token>,
-    parent_scope: Option<Scope>,
-    stdlib_scope: Scope,
-) -> Parse<Program> {
-    Parser::new(tokens, parent_scope, stdlib_scope).parse_program()
+pub fn parse(tokens: Vec<Token>) -> Parse<Program> {
+    Parser::new(tokens).parse_program()
 }
 
 pub type Parse<T> = Result<T, Error>;
 
 struct Parser {
     tokens: Stream<Token>,
-
-    /// The lexical scope that the parser is currently at. This should be
-    /// nested at the start of e.g. parse_block() to create a new scope,
-    /// and then unnested at the end to reset it. When a variable is created,
-    /// it should use the current scope.
-    scope: Scope,
-    /// A list of all the variables created in parsing up to the current point.
-    /// This should be added to whenever a new variable is created, and
-    /// referenced whenever a variable is used.
-    vars: HashSet<Identifier>,
 }
 
 impl Parser {
     /// A ancestor of `parent_scope` must include the stdlib.
-    fn new(tokens: Vec<Token>, scope: Option<Scope>, stdlib_scope: Scope) -> Self {
-        let scope = scope.unwrap_or_else(|| {
-            // nest stdlib to insulate it
-            stdlib_scope.nest()
-        });
-
-        let mut vars = HashSet::new();
-        interperter::stub_stdlib(&mut vars, stdlib_scope.clone());
-
+    fn new(tokens: Vec<Token>) -> Self {
         Parser {
             tokens: Stream::new(tokens),
-            scope,
-            vars,
-        }
-    }
-
-    fn nest_scope(&mut self) {
-        self.scope = self.scope.nest();
-    }
-
-    /// # Panics
-    ///
-    /// Panics if there is no parent scope to unnest into.
-    fn unnest_scope(&mut self) {
-        self.scope = *self.scope.parent.clone().unwrap();
-    }
-
-    fn resolve_scope_of(&self, identifier: &Identifier) -> Option<Identifier> {
-        if self.vars.contains(identifier) {
-            Some(identifier.clone())
-        } else {
-            let mut identifier = identifier.clone();
-            while let Some(parent) = identifier.in_parent_scope() {
-                if self.vars.contains(&parent) {
-                    return Some(parent);
-                }
-                identifier = parent;
-            }
-            None
         }
     }
 }
@@ -121,12 +71,12 @@ impl Parser {
 
         // In case of a function, create a new scope
         // Do it for variables too, bc it shouldn't matter
-        self.nest_scope();
+        todo!("nest scope");
 
         let arguments = if self.matches(&TokenData::OpenParen) {
             Some(self.parse_arguments(|parser| -> Parse<Pattern> {
                 let pattern = parser.parse_pattern()?;
-                parser.vars.insert(pattern.0.clone());
+                todo!("define arg var");
                 Ok(pattern)
             })?)
         } else {
@@ -138,17 +88,17 @@ impl Parser {
         let is_func = arguments.is_some();
         let value = if is_func {
             // Insert the var *before* so that the function can be recursive
-            self.vars.insert(pattern.0.clone());
+            todo!("define var");
             self.parse_expr()?
         } else {
             // Insert the var *after* so that variable shadowing works
             self.parse_expr().inspect(|_| {
-                self.vars.insert(pattern.0.clone());
+                todo!("define var");
             })?
         };
 
         // Exit out of the scope
-        self.unnest_scope();
+        todo!("exit scope");
 
         Ok(Binding {
             pattern,
@@ -287,7 +237,6 @@ impl Parser {
             let if_expr = self.parse_if_expr()?;
             Ok(Expr::If(Box::new(if_expr)))
         } else {
-            let scope = self.scope.clone();
             self.consume_map(
                 |t| match &t.data {
                     TokenData::True => Some(Literal(Bool(true))),
@@ -295,10 +244,9 @@ impl Parser {
                     TokenData::Number(n) => Some(Literal(Number(*n))),
                     TokenData::Str(s) => Some(Literal(Str(s.clone()))),
                     TokenData::Nil => Some(Literal(Nil)),
-                    TokenData::Identifier(name) => Some(Expr::Identifier(Identifier::new(
-                        scope.clone(),
-                        name.clone(),
-                    ))),
+                    TokenData::Identifier(name) => {
+                        Some(Expr::Identifier(Identifier::new(name.clone())))
+                    }
                     _ => None,
                 },
                 ErrorKind::ExpectedPrimary,
@@ -306,7 +254,7 @@ impl Parser {
             // Resolve variable
             .and_then(|expr| match expr {
                 Expr::Identifier(identifier) => {
-                    match self.resolve_scope_of(&identifier) {
+                    match todo!("resolve scope") {
                         Some(identifier) => Ok(Expr::Identifier(identifier)),
                         None => Err(Error {
                             pos: Some(
@@ -327,7 +275,7 @@ impl Parser {
     }
 
     fn parse_block(&mut self) -> Parse<Block> {
-        self.scope = self.scope.nest();
+        todo!("nest scope");
 
         let mut stmts = vec![];
         let mut expr = None;
@@ -344,7 +292,7 @@ impl Parser {
         }
 
         // we just nested the scope, so unnest it now
-        self.scope = *self.scope.parent.clone().expect("block has parent scope");
+        todo!("unnest");
 
         Ok(Block(stmts, expr))
     }
@@ -380,7 +328,7 @@ impl Parser {
             },
             ErrorKind::ExpectedIdentifier,
         )?;
-        Ok(Identifier::new(self.scope.clone(), name))
+        Ok(Identifier::new(name))
     }
 }
 

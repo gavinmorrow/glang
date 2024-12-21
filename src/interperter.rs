@@ -1,47 +1,44 @@
-pub mod env;
 mod stdlib;
 
 pub use stdlib::stub_stdlib;
 
 use std::iter::zip;
 
-use env::Environment;
-
 use crate::ast::{
     BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Literal,
     Pattern, Program, Stmt, UnaryExpr, UnaryOp,
 };
 
-pub fn interpert(program: Program, env: &mut Environment) -> Result<Value> {
-    program.evaluate(env)
+pub fn interpert(program: Program) -> Result<Value> {
+    program.evaluate()
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 trait Evaluate {
-    fn evaluate(&self, env: &mut Environment) -> Result<Value>;
+    fn evaluate(&self) -> Result<Value>;
 }
 
 impl Evaluate for Program {
-    fn evaluate(&self, env: &mut Environment) -> Result<Value> {
+    fn evaluate(&self) -> Result<Value> {
         for stmt in self {
-            stmt.evaluate(env)?;
+            stmt.evaluate()?;
         }
         Ok(Value::Nil)
     }
 }
 
 impl Evaluate for Stmt {
-    fn evaluate(&self, env: &mut Environment) -> Result<Value> {
+    fn evaluate(&self) -> Result<Value> {
         match self {
-            Stmt::Let(binding) => binding.evaluate(env),
-            Stmt::Expr(expr) => expr.evaluate(env),
+            Stmt::Let(binding) => binding.evaluate(),
+            Stmt::Expr(expr) => expr.evaluate(),
         }
     }
 }
 
 impl Evaluate for Binding {
-    fn evaluate(&self, env: &mut Environment) -> Result<Value> {
+    fn evaluate(&self) -> Result<Value> {
         let identifier = self.pattern.0.clone();
 
         let value = match &self.arguments {
@@ -52,43 +49,43 @@ impl Evaluate for Binding {
                 Value::Func(Func::User(UserFunc { arguments, body }))
             }
             // But do for a variable
-            None => self.value.evaluate(env)?,
+            None => self.value.evaluate()?,
         };
-        env.define(identifier, value);
+        todo!("actually define var");
         Ok(Value::Nil)
     }
 }
 
 impl Evaluate for Expr {
-    fn evaluate(&self, env: &mut Environment) -> Result<Value> {
+    fn evaluate(&self) -> Result<Value> {
         match self {
-            Expr::Block(block) => block.evaluate(env),
-            Expr::Call(call) => call.evaluate(env),
-            Expr::If(if_expr) => if_expr.evaluate(env),
-            Expr::Binary(binary_expr) => binary_expr.evaluate(env),
-            Expr::Unary(unary_expr) => unary_expr.evaluate(env),
-            Expr::Literal(literal) => literal.evaluate(env),
-            Expr::Identifier(identifier) => identifier.evaluate(env),
+            Expr::Block(block) => block.evaluate(),
+            Expr::Call(call) => call.evaluate(),
+            Expr::If(if_expr) => if_expr.evaluate(),
+            Expr::Binary(binary_expr) => binary_expr.evaluate(),
+            Expr::Unary(unary_expr) => unary_expr.evaluate(),
+            Expr::Literal(literal) => literal.evaluate(),
+            Expr::Identifier(identifier) => identifier.evaluate(),
         }
     }
 }
 
 impl Evaluate for Block {
-    fn evaluate(&self, env: &mut Environment) -> Result<Value> {
+    fn evaluate(&self) -> Result<Value> {
         for stmt in &self.0 {
-            stmt.evaluate(env)?;
+            stmt.evaluate()?;
         }
 
         self.1
             .as_ref()
-            .map(|e| e.evaluate(env))
+            .map(|e| e.evaluate())
             .unwrap_or(Ok(Value::Nil))
     }
 }
 
 impl Evaluate for Call {
-    fn evaluate(&self, env: &mut Environment) -> Result<Value> {
-        let func = self.target.evaluate(env)?;
+    fn evaluate(&self) -> Result<Value> {
+        let func = self.target.evaluate()?;
         let Value::Func(func) = func else {
             return Err(Error::new(ErrorKind::TypeError {
                 expected: DiagnosticType::Func,
@@ -101,17 +98,17 @@ impl Evaluate for Call {
                 for (pattern, value) in zip(func.arguments, &self.arguments) {
                     let identifier = pattern.0.clone();
 
-                    let value = value.evaluate(env)?;
-                    env.define(identifier, value);
+                    let value = value.evaluate()?;
+                    todo!()
                 }
 
                 // Evaluate function body
-                func.body.evaluate(env)
+                func.body.evaluate()
             }
             Func::Native(func) => {
                 let mut arguments = vec![];
                 for argument in &self.arguments {
-                    let argument = argument.evaluate(env)?;
+                    let argument = argument.evaluate()?;
                     arguments.push(argument);
                 }
                 func.call(arguments)
@@ -121,14 +118,14 @@ impl Evaluate for Call {
 }
 
 impl Evaluate for IfExpr {
-    fn evaluate(&self, env: &mut Environment) -> Result<Value> {
-        let condition = self.condition.evaluate(env)?;
+    fn evaluate(&self) -> Result<Value> {
+        let condition = self.condition.evaluate()?;
         if condition.is_truthy() {
-            self.then_block.evaluate(env)
+            self.then_block.evaluate()
         } else {
             match &self.else_block {
-                Some(ElseBlock::Else(else_block)) => Ok(else_block.evaluate(env)?),
-                Some(ElseBlock::ElseIf(if_expr)) => Ok(if_expr.evaluate(env)?),
+                Some(ElseBlock::Else(else_block)) => Ok(else_block.evaluate()?),
+                Some(ElseBlock::ElseIf(if_expr)) => Ok(if_expr.evaluate()?),
                 None => Ok(Value::Nil),
             }
         }
@@ -136,12 +133,12 @@ impl Evaluate for IfExpr {
 }
 
 impl Evaluate for BinaryExpr {
-    fn evaluate(&self, env: &mut Environment) -> Result<Value> {
+    fn evaluate(&self) -> Result<Value> {
         use Value::{Bool, Num, Str};
 
-        let lhs = self.lhs.evaluate(env)?;
+        let lhs = self.lhs.evaluate()?;
         // A closure so that it is lazy, for short-circuiting
-        let mut rhs = || self.rhs.evaluate(env);
+        let rhs = || self.rhs.evaluate();
         Ok(match &self.op {
             BinaryOp::Or => {
                 if lhs.is_truthy() {
@@ -191,8 +188,8 @@ impl Evaluate for BinaryExpr {
 }
 
 impl Evaluate for UnaryExpr {
-    fn evaluate(&self, env: &mut Environment) -> Result<Value> {
-        let rhs = self.rhs.evaluate(env)?;
+    fn evaluate(&self) -> Result<Value> {
+        let rhs = self.rhs.evaluate()?;
         match self.op {
             UnaryOp::Not => Ok(Value::Bool(!rhs.is_truthy())),
             UnaryOp::Negate => Ok(Value::Num(-rhs.as_num()?)),
@@ -201,7 +198,7 @@ impl Evaluate for UnaryExpr {
 }
 
 impl Evaluate for Literal {
-    fn evaluate(&self, _env: &mut Environment) -> Result<Value> {
+    fn evaluate(&self) -> Result<Value> {
         Ok(match self {
             Literal::Bool(b) => Value::Bool(*b),
             Literal::Number(n) => Value::Num(*n),
@@ -212,11 +209,8 @@ impl Evaluate for Literal {
 }
 
 impl Evaluate for Identifier {
-    fn evaluate(&self, env: &mut Environment) -> Result<Value> {
-        Ok(env
-            .get(self)
-            .unwrap_or_else(|| panic!("Variable not defined!! {self:#?}"))
-            .clone())
+    fn evaluate(&self) -> Result<Value> {
+        todo!()
     }
 }
 
