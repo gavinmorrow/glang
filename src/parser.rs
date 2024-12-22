@@ -1,4 +1,4 @@
-use env::Env;
+pub use env::Env;
 
 use crate::{
     ast::{
@@ -10,8 +10,8 @@ use crate::{
 };
 
 /// A ancestor of `parent_scope` must include the stdlib.
-pub fn parse(tokens: Vec<Token>) -> Parse<Program> {
-    Parser::new(tokens).parse_program()
+pub fn parse(tokens: Vec<Token>, env: &mut Env) -> Parse<Program> {
+    Parser::new(tokens).parse_program(env)
 }
 
 pub type Parse<T> = Result<T, Error>;
@@ -22,7 +22,7 @@ struct Parser {
 }
 
 mod env {
-    use std::ops::Deref;
+    use std::ops::{Deref, DerefMut};
 
     pub struct Env {
         locals: Vec<Vec<Local>>,
@@ -55,6 +55,7 @@ mod env {
         }
     }
 
+    #[clippy::has_significant_drop]
     pub struct ScopeGuard<'a>(&'a mut Env);
     impl<'a> ScopeGuard<'a> {
         fn new(env: &'a mut Env) -> Self {
@@ -66,6 +67,11 @@ mod env {
         type Target = Env;
 
         fn deref(&self) -> &Self::Target {
+            self.0
+        }
+    }
+    impl DerefMut for ScopeGuard<'_> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
             self.0
         }
     }
@@ -92,17 +98,17 @@ impl Parser {
 }
 
 impl Parser {
-    fn parse_program(&mut self) -> Parse<Program> {
+    fn parse_program(&mut self, env: &mut Env) -> Parse<Program> {
         let mut stmts = vec![];
         while self.tokens.peek().is_some() {
-            let stmt = self.parse_stmt()?;
+            let stmt = self.parse_stmt(env)?;
             stmts.push(stmt);
         }
         Ok(stmts)
     }
 
-    fn parse_stmt(&mut self) -> Parse<Stmt> {
-        match self.parse_stmt_or_expr()? {
+    fn parse_stmt(&mut self, env: &mut Env) -> Parse<Stmt> {
+        match self.parse_stmt_or_expr(env)? {
             StmtOrExpr::Stmt(stmt) => Ok(stmt),
             StmtOrExpr::Expr(_) => Err(Error {
                 pos: self.tokens.peek().map(|t| t.pos),
@@ -112,13 +118,13 @@ impl Parser {
     }
 
     // This is done weirdly to allow for blocks to end in an expr easily
-    fn parse_stmt_or_expr(&mut self) -> Parse<StmtOrExpr> {
+    fn parse_stmt_or_expr(&mut self, env: &mut Env) -> Parse<StmtOrExpr> {
         if self.matches(&TokenData::Let) {
-            let binding = self.parse_binding()?;
+            let binding = self.parse_binding(env)?;
             self.expect(TokenData::Semicolon)?;
             Ok(StmtOrExpr::Stmt(Stmt::Let(binding)))
         } else {
-            let expr = self.parse_expr()?;
+            let expr = self.parse_expr(env)?;
             if self.expect(TokenData::Semicolon).is_ok() {
                 Ok(StmtOrExpr::Stmt(Stmt::Expr(expr)))
             } else {
@@ -127,15 +133,18 @@ impl Parser {
         }
     }
 
-    fn parse_binding(&mut self) -> Parse<Binding> {
+    fn parse_binding(&mut self, env: &mut Env) -> Parse<Binding> {
         let pattern = self.parse_pattern()?;
 
         let arguments = if self.matches(&TokenData::OpenParen) {
-            Some(self.parse_arguments(|parser| -> Parse<Pattern> {
-                let pattern = parser.parse_pattern()?;
-                todo!("define arg var");
-                Ok(pattern)
-            })?)
+            Some(self.parse_arguments(
+                |parser, env| -> Parse<Pattern> {
+                    let pattern = parser.parse_pattern()?;
+                    todo!("define arg var");
+                    Ok(pattern)
+                },
+                env,
+            )?)
         } else {
             None
         };
@@ -147,10 +156,10 @@ impl Parser {
         let value = if is_func {
             // Insert the var *before* so that the function can be recursive
             self.env.declare_local(name);
-            self.parse_expr()?
+            self.parse_expr(env)?
         } else {
             // Insert the var *after* so that variable shadowing works
-            self.parse_expr()
+            self.parse_expr(env)
                 .inspect(|_| self.env.declare_local(name))?
         };
 
@@ -166,50 +175,51 @@ impl Parser {
         Ok(Pattern(identifier))
     }
 
-    fn parse_expr(&mut self) -> Parse<Expr> {
-        let binary_expr = self.parse_logic_or()?;
+    fn parse_expr(&mut self, env: &mut Env) -> Parse<Expr> {
+        let binary_expr = self.parse_logic_or(env)?;
         Ok(binary_expr)
     }
 
     fn parse_binary_expr(
         &mut self,
-        mut parse_operand: impl FnMut(&mut Parser) -> Parse<Expr>,
+        mut parse_operand: impl FnMut(&mut Parser, &mut Env) -> Parse<Expr>,
+        env: &mut Env,
         parse_operator: impl Fn(&Token) -> Option<BinaryOp>,
     ) -> Parse<Expr> {
-        let mut lhs = parse_operand(self)?;
+        let mut lhs = parse_operand(self, env)?;
 
         while let Some(op) = self.tokens.next_if_map(&parse_operator) {
-            let rhs = parse_operand(self)?;
+            let rhs = parse_operand(self, env)?;
             lhs = Expr::Binary(Box::new(BinaryExpr { lhs, op, rhs }));
         }
 
         Ok(lhs)
     }
 
-    fn parse_logic_or(&mut self) -> Parse<Expr> {
-        self.parse_binary_expr(Self::parse_logic_and, |t| match t.data {
+    fn parse_logic_or(&mut self, env: &mut Env) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_logic_and, env, |t| match t.data {
             TokenData::Or => Some(BinaryOp::Or),
             _ => None,
         })
     }
 
-    fn parse_logic_and(&mut self) -> Parse<Expr> {
-        self.parse_binary_expr(Self::parse_equality, |t| match t.data {
+    fn parse_logic_and(&mut self, env: &mut Env) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_equality, env, |t| match t.data {
             TokenData::And => Some(BinaryOp::And),
             _ => None,
         })
     }
 
-    fn parse_equality(&mut self) -> Parse<Expr> {
-        self.parse_binary_expr(Self::parse_comparison, |t| match t.data {
+    fn parse_equality(&mut self, env: &mut Env) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_comparison, env, |t| match t.data {
             TokenData::BangEquals => Some(BinaryOp::NotEq),
             TokenData::EqualsEquals => Some(BinaryOp::Eq),
             _ => None,
         })
     }
 
-    fn parse_comparison(&mut self) -> Parse<Expr> {
-        self.parse_binary_expr(Self::parse_term, |t| match t.data {
+    fn parse_comparison(&mut self, env: &mut Env) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_term, env, |t| match t.data {
             TokenData::Less => Some(BinaryOp::Less),
             TokenData::LessEquals => Some(BinaryOp::LessEq),
             TokenData::Greater => Some(BinaryOp::Greater),
@@ -218,23 +228,23 @@ impl Parser {
         })
     }
 
-    fn parse_term(&mut self) -> Parse<Expr> {
-        self.parse_binary_expr(Self::parse_factor, |t| match t.data {
+    fn parse_term(&mut self, env: &mut Env) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_factor, env, |t| match t.data {
             TokenData::Minus => Some(BinaryOp::Subtract),
             TokenData::Plus => Some(BinaryOp::Add),
             _ => None,
         })
     }
 
-    fn parse_factor(&mut self) -> Parse<Expr> {
-        self.parse_binary_expr(Self::parse_unary, |t| match t.data {
+    fn parse_factor(&mut self, env: &mut Env) -> Parse<Expr> {
+        self.parse_binary_expr(Self::parse_unary, env, |t| match t.data {
             TokenData::Slash => Some(BinaryOp::Divide),
             TokenData::Star => Some(BinaryOp::Multiply),
             _ => None,
         })
     }
 
-    fn parse_unary(&mut self) -> Parse<Expr> {
+    fn parse_unary(&mut self, env: &mut Env) -> Parse<Expr> {
         let op = self.tokens.next_if_map(|t| match t.data {
             TokenData::Bang => Some(UnaryOp::Not),
             TokenData::Minus => Some(UnaryOp::Negate),
@@ -242,26 +252,30 @@ impl Parser {
         });
 
         if let Some(op) = op {
-            let rhs = self.parse_unary()?;
+            let rhs = self.parse_unary(env)?;
             Ok(Expr::Unary(Box::new(UnaryExpr { op, rhs })))
         } else {
-            self.parse_call()
+            self.parse_call(env)
         }
     }
 
-    fn parse_call(&mut self) -> Parse<Expr> {
-        let target = self.parse_primary()?;
+    fn parse_call(&mut self, env: &mut Env) -> Parse<Expr> {
+        let target = self.parse_primary(env)?;
 
         if !self.matches(&TokenData::OpenParen) {
             return Ok(target);
         }
 
-        let arguments = self.parse_arguments(Self::parse_expr)?;
+        let arguments = self.parse_arguments(Self::parse_expr, env)?;
         let target = Box::new(target);
         Ok(Expr::Call(Call { target, arguments }))
     }
 
-    fn parse_arguments<T>(&mut self, parse_arg: impl Fn(&mut Parser) -> Parse<T>) -> Parse<Vec<T>> {
+    fn parse_arguments<T>(
+        &mut self,
+        parse_arg: impl Fn(&mut Parser, &mut Env) -> Parse<T>,
+        env: &mut Env,
+    ) -> Parse<Vec<T>> {
         if self.matches(&TokenData::CloseParen) {
             return Ok(vec![]);
         }
@@ -269,7 +283,7 @@ impl Parser {
         // There is at least one argument
         let mut arguments = vec![];
         loop {
-            let arg = parse_arg(self)?;
+            let arg = parse_arg(self, env)?;
             arguments.push(arg);
 
             if self.matches(&TokenData::CloseParen) {
@@ -281,14 +295,14 @@ impl Parser {
         Ok(arguments)
     }
 
-    fn parse_primary(&mut self) -> Parse<Expr> {
+    fn parse_primary(&mut self, env: &mut Env) -> Parse<Expr> {
         use crate::ast::Literal::{Bool, Nil, Number, Str};
         use Expr::Literal;
         if self.matches(&TokenData::OpenBrace) {
-            let block = self.parse_block()?;
+            let block = self.parse_block(env)?;
             Ok(Expr::Block(block))
         } else if self.matches(&TokenData::If) {
-            let if_expr = self.parse_if_expr()?;
+            let if_expr = self.parse_if_expr(env)?;
             Ok(Expr::If(Box::new(if_expr)))
         } else {
             self.consume_map(
@@ -308,11 +322,13 @@ impl Parser {
         }
     }
 
-    fn parse_block(&mut self) -> Parse<Block> {
+    fn parse_block(&mut self, env: &mut Env) -> Parse<Block> {
+        let mut env = env.create_scope();
+
         let mut stmts = vec![];
         let mut expr = None;
         while !self.matches(&TokenData::CloseBrace) {
-            let stmt_or_expr = self.parse_stmt_or_expr()?;
+            let stmt_or_expr = self.parse_stmt_or_expr(&mut *env)?;
             match stmt_or_expr {
                 StmtOrExpr::Stmt(stmt) => stmts.push(stmt),
                 StmtOrExpr::Expr(e) => {
@@ -326,17 +342,17 @@ impl Parser {
         Ok(Block(stmts, expr))
     }
 
-    fn parse_if_expr(&mut self) -> Parse<IfExpr> {
-        let condition = self.parse_expr()?;
+    fn parse_if_expr(&mut self, env: &mut Env) -> Parse<IfExpr> {
+        let condition = self.parse_expr(env)?;
         self.expect(TokenData::OpenBrace)?;
-        let then_block = self.parse_block()?;
+        let then_block = self.parse_block(env)?;
 
         let else_block = if self.matches(&TokenData::Else) {
             Some(if self.matches(&TokenData::If) {
-                ElseBlock::ElseIf(Box::new(self.parse_if_expr()?))
+                ElseBlock::ElseIf(Box::new(self.parse_if_expr(env)?))
             } else {
                 self.expect(TokenData::OpenBrace)?;
-                ElseBlock::Else(self.parse_block()?)
+                ElseBlock::Else(self.parse_block(env)?)
             })
         } else {
             None
