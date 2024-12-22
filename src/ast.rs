@@ -97,9 +97,13 @@ pub enum Literal {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
     pub name: String,
+    pub stack_index: Option<usize>,
 }
 impl Identifier {
     pub fn new(name: String) -> Self {
-        Self { name }
+        Self {
+            name,
+            stack_index: None,
+        }
     }
 }
