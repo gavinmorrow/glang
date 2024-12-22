@@ -1,3 +1,5 @@
+use env::Env;
+
 use crate::{
     ast::{
         BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Pattern,
@@ -16,6 +18,67 @@ pub type Parse<T> = Result<T, Error>;
 
 struct Parser {
     tokens: Stream<Token>,
+    env: Env,
+}
+
+mod env {
+    use std::ops::Deref;
+
+    pub struct Env {
+        locals: Vec<Vec<Local>>,
+    }
+
+    impl Env {
+        pub fn new() -> Self {
+            Env {
+                locals: vec![Vec::new()],
+            }
+        }
+
+        pub fn scope_depth(&self) -> usize {
+            self.locals.len()
+        }
+
+        pub fn create_scope(&mut self) -> ScopeGuard<'_> {
+            ScopeGuard::new(self)
+        }
+
+        pub fn declare_local(&mut self, name: String) {
+            let local = Local {
+                name,
+                depth: self.scope_depth(),
+            };
+            self.locals
+                .last_mut()
+                .expect("scope should exist")
+                .push(local);
+        }
+    }
+
+    pub struct ScopeGuard<'a>(&'a mut Env);
+    impl<'a> ScopeGuard<'a> {
+        fn new(env: &'a mut Env) -> Self {
+            env.locals.push(Vec::new());
+            ScopeGuard(env)
+        }
+    }
+    impl Deref for ScopeGuard<'_> {
+        type Target = Env;
+
+        fn deref(&self) -> &Self::Target {
+            self.0
+        }
+    }
+    impl Drop for ScopeGuard<'_> {
+        fn drop(&mut self) {
+            self.0.locals.pop().expect("scope should exist");
+        }
+    }
+
+    struct Local {
+        name: String,
+        depth: usize,
+    }
 }
 
 impl Parser {
@@ -23,6 +86,7 @@ impl Parser {
     fn new(tokens: Vec<Token>) -> Self {
         Parser {
             tokens: Stream::new(tokens),
+            env: Env::new(),
         }
     }
 }
