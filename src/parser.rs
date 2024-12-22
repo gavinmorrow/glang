@@ -143,15 +143,15 @@ impl Parser {
         self.expect(TokenData::Equals)?;
 
         let is_func = arguments.is_some();
+        let name = pattern.0.name.clone();
         let value = if is_func {
             // Insert the var *before* so that the function can be recursive
-            todo!("define var");
+            self.env.declare_local(name);
             self.parse_expr()?
         } else {
             // Insert the var *after* so that variable shadowing works
-            self.parse_expr().inspect(|_| {
-                todo!("define var");
-            })?
+            self.parse_expr()
+                .inspect(|_| self.env.declare_local(name))?
         };
 
         Ok(Binding {
