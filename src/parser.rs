@@ -42,7 +42,8 @@ mod env {
         }
 
         pub fn scope_depth(&self) -> usize {
-            self.locals.len()
+            assert!(!self.locals.is_empty());
+            self.locals.len() - 1
         }
 
         pub fn create_scope(&mut self) -> ScopeGuard<'_> {
