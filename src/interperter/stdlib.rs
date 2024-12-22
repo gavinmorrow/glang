@@ -4,12 +4,10 @@ use crate::ast::Identifier;
 
 use super::{Error, ErrorKind, Func, NativeFunc, Value};
 
-pub fn stub_stdlib(vars: &mut HashSet<Identifier>) {
+pub fn stub_stdlib(env: &mut crate::parser::Env) {
     macro_rules! stub {
         ($func:ident) => {
-            vars.insert(Identifier {
-                name: stringify!($func).to_string(),
-            });
+            env.declare_local(stringify!($func).to_string());
         };
         ($func:ident, $($funcs:ident),+) => {
             stub!($func);

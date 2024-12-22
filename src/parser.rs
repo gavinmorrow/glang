@@ -30,9 +30,15 @@ mod env {
 
     impl Env {
         pub fn new() -> Self {
-            Env {
+            let mut env = Env {
                 locals: vec![Vec::new()],
-            }
+            };
+
+            crate::interperter::stub_stdlib(&mut env);
+            // new scope for non-stdlib
+            env.locals.push(Vec::new());
+
+            env
         }
 
         pub fn scope_depth(&self) -> usize {
