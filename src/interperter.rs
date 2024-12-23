@@ -15,29 +15,81 @@ pub fn interpert(program: Program, env: &mut Env) -> Result<Value> {
 }
 
 mod env {
-    use super::Value;
+    use std::ops::{Deref, DerefMut};
+
+    use super::{Func, Value};
 
     pub struct Env {
         locals_stack: Vec<Value>,
+        call_frames: Vec<CallFrame>,
     }
 
     impl Env {
         pub fn new() -> Self {
             let mut env = Env {
                 locals_stack: Vec::new(),
+                call_frames: Vec::new(),
             };
             super::stdlib::define_stdlib(&mut env);
             env
         }
 
         pub fn get(&self, i: usize) -> &Value {
+            let offset = self
+                .call_frames
+                .last()
+                .map(|frame| frame.stack_offset)
+                .unwrap_or(0);
+
             self.locals_stack
-                .get(i)
+                .get(offset + i)
                 .expect("index provided by parser is valid")
         }
 
         pub fn define(&mut self, value: Value) {
             self.locals_stack.push(value);
+        }
+
+        pub fn new_frame(&mut self, func: Func) -> FrameGuard {
+            FrameGuard::new(self, func)
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct CallFrame {
+        func: Func,
+        stack_offset: usize,
+    }
+
+    #[clippy::has_significant_drop]
+    pub struct FrameGuard<'a>(&'a mut Env);
+    impl<'a> FrameGuard<'a> {
+        fn new(env: &'a mut Env, func: Func) -> Self {
+            let stack_offset = env.locals_stack.len();
+            let call_frame = CallFrame { func, stack_offset };
+            env.call_frames.push(call_frame);
+
+            FrameGuard(env)
+        }
+    }
+    impl Deref for FrameGuard<'_> {
+        type Target = Env;
+
+        fn deref(&self) -> &Self::Target {
+            self.0
+        }
+    }
+    impl DerefMut for FrameGuard<'_> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            self.0
+        }
+    }
+    impl Drop for FrameGuard<'_> {
+        fn drop(&mut self) {
+            self.0
+                .call_frames
+                .pop()
+                .expect("env should have call frame to pop");
         }
     }
 }
@@ -122,22 +174,22 @@ impl Evaluate for Call {
             }));
         };
 
+        let mut env = env.new_frame(func.clone());
+
         match func {
             Func::User(func) => {
-                for (pattern, value) in zip(func.arguments, &self.arguments) {
-                    let identifier = pattern.0.clone();
-
-                    let value = value.evaluate(env)?;
-                    todo!()
+                for (_pattern, value) in zip(func.arguments, &self.arguments) {
+                    let value = value.evaluate(&mut env)?;
+                    env.define(value);
                 }
 
                 // Evaluate function body
-                func.body.evaluate(env)
+                func.body.evaluate(&mut env)
             }
             Func::Native(func) => {
                 let mut arguments = vec![];
                 for argument in &self.arguments {
-                    let argument = argument.evaluate(env)?;
+                    let argument = argument.evaluate(&mut env)?;
                     arguments.push(argument);
                 }
                 func.call(arguments)

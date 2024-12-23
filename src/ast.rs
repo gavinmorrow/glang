@@ -1,5 +1,3 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 pub type Program = Vec<Stmt>;
 
 #[derive(Clone, Debug)]
