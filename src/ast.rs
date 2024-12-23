@@ -106,4 +106,9 @@ impl Identifier {
             stack_index: None,
         }
     }
+
+    pub fn resolve(mut self, stack_index: usize) -> Self {
+        self.stack_index = Some(stack_index);
+        self
+    }
 }

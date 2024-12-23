@@ -34,7 +34,7 @@ mod env {
                 locals: vec![Vec::new()],
             };
 
-            crate::interperter::stub_stdlib(&mut env);
+            // crate::interperter::stub_stdlib(&mut env);
             // new scope for non-stdlib
             env.locals.push(Vec::new());
 
@@ -59,6 +59,23 @@ mod env {
                 .last_mut()
                 .expect("scope should exist")
                 .push(local);
+        }
+
+        // Look for the most deeply-scoped local with the given name.
+        pub fn resolve(&self, name: &str) -> usize {
+            // This was much more annoying than I thought it would be
+            // <https://users.rust-lang.org/t/cant-flatten-enumerate-and-then-reverse-iterator/122931>
+
+            let stack = self.locals.iter().flatten();
+            let len = stack.clone().count();
+            let indexes_rev = (0..len).rev();
+
+            let mut stack = stack.rev().zip(indexes_rev);
+            let local = dbg!(stack)
+                .find(|(local, _)| local.name == name)
+                .expect("resolved local should exist on stack");
+
+            local.1
         }
     }
 
@@ -88,6 +105,7 @@ mod env {
         }
     }
 
+    #[derive(Debug)]
     struct Local {
         name: String,
         depth: usize,
@@ -141,12 +159,12 @@ impl Parser {
     }
 
     fn parse_binding(&mut self, env: &mut Env) -> Parse<Binding> {
-        let pattern = self.parse_pattern()?;
+        let pattern = self.parse_pattern(env)?;
 
         let arguments = if self.matches(&TokenData::OpenParen) {
             Some(self.parse_arguments(
                 |parser, env| -> Parse<Pattern> {
-                    let pattern = parser.parse_pattern()?;
+                    let pattern = parser.parse_pattern(env)?;
                     todo!("define arg var");
                     Ok(pattern)
                 },
@@ -177,8 +195,8 @@ impl Parser {
         })
     }
 
-    fn parse_pattern(&mut self) -> Parse<Pattern> {
-        let identifier = self.parse_identifier()?;
+    fn parse_pattern(&mut self, env: &mut Env) -> Parse<Pattern> {
+        let identifier = self.parse_identifier(env)?;
         Ok(Pattern(identifier))
     }
 
@@ -320,7 +338,9 @@ impl Parser {
                     TokenData::Str(s) => Some(Literal(Str(s.clone()))),
                     TokenData::Nil => Some(Literal(Nil)),
                     TokenData::Identifier(name) => {
-                        Some(Expr::Identifier(Identifier::new(name.clone())))
+                        let stack_index = env.resolve(name);
+                        let identifier = Identifier::new(name.clone()).resolve(stack_index);
+                        Some(Expr::Identifier(identifier))
                     }
                     _ => None,
                 },
@@ -372,7 +392,7 @@ impl Parser {
         })
     }
 
-    fn parse_identifier(&mut self) -> Parse<Identifier> {
+    fn parse_identifier(&mut self, _env: &mut Env) -> Parse<Identifier> {
         let name = self.consume_map(
             |t| match &t.data {
                 TokenData::Identifier(name) => Some(name.clone()),
