@@ -3,11 +3,9 @@ mod stdlib;
 pub use env::Env;
 pub use stdlib::stub_stdlib;
 
-use std::iter::zip;
-
 use crate::ast::{
-    BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Literal,
-    Pattern, Program, Stmt, UnaryExpr, UnaryOp,
+    BinaryExpr, BinaryOp, Binding, BindingMetadata, Block, Call, ElseBlock, Expr, IdentLocation,
+    Identifier, IfExpr, Literal, Pattern, Program, Stmt, UnaryExpr, UnaryOp,
 };
 
 pub fn interpert(program: Program, env: &mut Env) -> Result<Value> {
@@ -16,6 +14,8 @@ pub fn interpert(program: Program, env: &mut Env) -> Result<Value> {
 
 mod env {
     use std::ops::{Deref, DerefMut};
+
+    use crate::ast::{IdentLocation, Upvalue};
 
     use super::{Func, Value};
 
@@ -34,19 +34,60 @@ mod env {
             env
         }
 
-        pub fn get(&self, i: usize) -> &Value {
-            let offset = self
-                .call_frames
-                .last()
-                .map(|frame| frame.stack_offset)
-                .unwrap_or(0);
+        pub fn get(&self, i: IdentLocation) -> &Value {
+            eprintln!(
+                "getting from env {i:?} offset {}",
+                self.call_frames.last().map(|f| f.stack_offset).unwrap_or(0)
+            );
+            match i {
+                IdentLocation::Stack(i) => self.get_local_from_frame(i, self.call_frames.last()),
 
-            self.locals_stack
-                .get(offset + i)
-                .unwrap_or_else(|| panic!(
-                    "index provided by parser should be valid. index: {i}, offset: {offset}, stack: {:#?}",
-                    self.locals_stack
-                ))
+                IdentLocation::Upvalue(upvalue_index) => {
+                    if let Some(frame_index) = (self.call_frames.len()).checked_sub(1) {
+                        let frame = &self.call_frames[frame_index];
+
+                        let Func::User(func) = &frame.func else {
+                            panic!("call frame should not be native func");
+                        };
+
+                        &func.upvalues[upvalue_index]
+                    } else {
+                        // a global
+                        eprintln!("getting global {upvalue_index}");
+                        &self.locals_stack[upvalue_index]
+                    }
+                }
+            }
+        }
+
+        pub fn resolve_upvalue(&self, upvalue: Upvalue) -> &Value {
+            let current_frame = self.call_frames.last();
+            eprintln!(
+                "resolving arg {upvalue:?} in frame {}",
+                current_frame.map(|f| f.stack_offset).unwrap_or(0)
+            );
+            if upvalue.is_local {
+                self.get_local_from_frame(upvalue.index, current_frame)
+            } else {
+                self.get_upvalue_from_frame(upvalue.index, current_frame)
+            }
+        }
+
+        fn get_local_from_frame(&self, i: usize, frame: Option<&CallFrame>) -> &Value {
+            let stack_offset = frame.map(|f| f.stack_offset).unwrap_or(0);
+            self.locals_stack.get(stack_offset + i).unwrap_or_else(|| {
+                panic!(
+                    "stack location should be valid. i: {i}, offset: {}, stack: {:#?}",
+                    stack_offset, self.locals_stack
+                )
+            })
+        }
+
+        fn get_upvalue_from_frame<'f>(&self, i: usize, frame: Option<&'f CallFrame>) -> &'f Value {
+            let Func::User(func) = &frame.expect("frame should exist for upvalue").func else {
+                panic!("call frame should not be native func");
+            };
+            &func.upvalues[i]
         }
 
         pub fn define(&mut self, value: Value) {
@@ -95,6 +136,7 @@ mod env {
                 .expect("env should have call frame")
                 .stack_offset;
             self.locals_stack.drain(offset..);
+
             self.call_frames
                 .pop()
                 .expect("env should have call frame to pop");
@@ -130,15 +172,26 @@ impl Evaluate for Binding {
     fn evaluate(&self, env: &mut Env) -> Result<Value> {
         let identifier = self.pattern.0.clone();
 
-        let value = match &self.arguments {
+        let value = match &self.metadata {
             // Don't `.evaluate()` anything for a function
-            Some(arguments) => {
+            BindingMetadata::Func {
+                arguments,
+                upvalues,
+            } => {
                 let arguments = arguments.clone();
+                let upvalues = upvalues
+                    .iter()
+                    .map(|&upvalue| env.resolve_upvalue(upvalue).clone())
+                    .collect();
                 let body = self.value.clone();
-                Value::Func(Func::User(UserFunc { arguments, body }))
+                Value::Func(Func::User(UserFunc {
+                    arguments,
+                    upvalues,
+                    body,
+                }))
             }
             // But do for a variable
-            None => self.value.evaluate(env)?,
+            BindingMetadata::Var => self.value.evaluate(env)?,
         };
         env.define(value);
         Ok(Value::Nil)
@@ -296,12 +349,9 @@ impl Evaluate for Literal {
 
 impl Evaluate for Identifier {
     fn evaluate(&self, env: &mut Env) -> Result<Value> {
-        eprintln!("Evaluating {self:#?}");
+        eprintln!("evaluating ident {:?}", self.name);
         Ok(env
-            .get(
-                self.stack_index
-                    .expect("parser should have resolved variable"),
-            )
+            .get(self.location.expect("parser should have resolved variable"))
             .clone())
     }
 }
@@ -378,6 +428,7 @@ pub enum Func {
 #[derive(Clone, Debug)]
 pub struct UserFunc {
     arguments: Vec<Pattern>,
+    upvalues: Vec<Value>,
     body: Expr,
 }
 

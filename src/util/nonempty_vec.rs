@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::ops::{Deref, Index, IndexMut};
 
 /// A nonempty Vec
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -47,5 +47,19 @@ impl<T> Deref for NEVec<T> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<T> Index<usize> for NEVec<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl<T> IndexMut<usize> for NEVec<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
     }
 }

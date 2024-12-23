@@ -9,11 +9,26 @@ pub enum Stmt {
 #[derive(Clone, Debug)]
 pub struct Binding {
     pub pattern: Pattern,
-    pub arguments: Option<Vec<Pattern>>,
+    pub metadata: BindingMetadata,
     pub value: Expr,
 }
 #[derive(Clone, Debug)]
 pub struct Pattern(pub Identifier);
+
+#[derive(Clone, Debug)]
+pub enum BindingMetadata {
+    Var,
+    Func {
+        arguments: Vec<Pattern>,
+        upvalues: Vec<Upvalue>,
+    },
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Upvalue {
+    pub index: usize,
+    pub is_local: bool,
+}
 
 #[derive(Clone, Debug)]
 pub enum Expr {
@@ -95,18 +110,24 @@ pub enum Literal {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
     pub name: String,
-    pub stack_index: Option<usize>,
+    pub location: Option<IdentLocation>,
 }
 impl Identifier {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            stack_index: None,
+            location: None,
         }
     }
 
-    pub fn resolve(mut self, stack_index: usize) -> Self {
-        self.stack_index = Some(stack_index);
+    pub fn resolve(mut self, location: IdentLocation) -> Self {
+        self.location = Some(location);
         self
     }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum IdentLocation {
+    Stack(usize),
+    Upvalue(usize),
 }

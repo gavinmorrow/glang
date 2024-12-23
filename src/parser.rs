@@ -2,8 +2,8 @@ pub use env::Env;
 
 use crate::{
     ast::{
-        BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Pattern,
-        Program, Stmt, UnaryExpr, UnaryOp,
+        BinaryExpr, BinaryOp, Binding, BindingMetadata, Block, Call, ElseBlock, Expr, Identifier,
+        IfExpr, Pattern, Program, Stmt, UnaryExpr, UnaryOp,
     },
     lexer::{Pos, Token, TokenData},
     stream::Stream,
@@ -23,34 +23,36 @@ struct Parser {
 mod env {
     use std::ops::{Deref, DerefMut};
 
-    use crate::util::nonempty_vec::NEVec;
+    use crate::{
+        ast::{IdentLocation, Upvalue},
+        util::nonempty_vec::NEVec,
+    };
 
     type Scope = Vec<Local>;
-    type CallFrame = NEVec<Scope>;
 
     #[derive(Debug)]
     pub struct Env {
         /// A list of call frames, which is a list of blocks, each with a list
         /// of locals.
-        locals: NEVec<CallFrame>,
+        frames: NEVec<CallFrame>,
     }
 
     impl Env {
         pub fn new() -> Self {
             let mut env = Env {
-                locals: NEVec::default(),
+                frames: NEVec::default(),
             };
 
             crate::interperter::stub_stdlib(&mut env);
             // new scope for non-stdlib
-            env.locals.last_mut().push(Vec::default());
+            env.frames.last_mut().scopes.push(Vec::default());
 
             env
         }
 
         pub fn scope_depth(&self) -> usize {
-            assert!(!self.locals.is_empty());
-            self.locals.len() - 1
+            assert!(!self.frames.is_empty());
+            self.frames.len() - 1
         }
 
         pub fn create_scope(&mut self) -> ScopeGuard<'_> {
@@ -66,33 +68,71 @@ mod env {
                 name,
                 depth: self.scope_depth(),
             };
-            self.locals.last_mut().last_mut().push(local);
+            self.frames.last_mut().scopes.last_mut().push(local);
         }
 
         // Look for the most deeply-scoped local with the given name.
-        pub fn resolve(&self, name: &str) -> usize {
+        pub fn resolve(&mut self, name: &str) -> Option<IdentLocation> {
+            // can always subtract 1 from len b/c it is non-empty (a NEVec)
+            self.resolve_with_frame(name, self.frames.len() - 1)
+        }
+
+        fn resolve_with_frame(
+            // Mutable so upvalues can be recorded
+            &mut self,
+            name: &str,
+            frame_index: usize,
+        ) -> Option<IdentLocation> {
             // This was much more annoying than I thought it would be
             // <https://users.rust-lang.org/t/cant-flatten-enumerate-and-then-reverse-iterator/122931>
 
-            let call_frame = self.locals.last();
-            let stack = call_frame.iter().flatten();
+            let call_frame = &self.frames[frame_index];
+            let stack = call_frame.scopes.iter().flatten();
             let len = stack.clone().count();
             let indexes_rev = (0..len).rev();
 
             let mut stack = stack.rev().zip(indexes_rev);
-            let local = stack
-                .find(|(local, _)| local.name == name)
-                .unwrap_or_else(|| panic!("resolved local \"{name}\" should exist on stack"));
+            if let Some((_, i)) = stack.find(|(local, _)| local.name == name) {
+                eprintln!("found {name} in stack. i: {i}");
+                Some(IdentLocation::Stack(i))
+            } else if let Some(parent_index) = frame_index.checked_sub(1) {
+                // make upvalue
+                let location = self.resolve_with_frame(name, parent_index)?;
+                let (location, is_local) = match location {
+                    IdentLocation::Stack(i) => (i, true),
+                    IdentLocation::Upvalue(i) => (i, false),
+                };
 
-            local.1
+                // This is the upvalue that goes in the func metadata
+                let upvalue = Upvalue {
+                    index: location,
+                    is_local,
+                };
+                eprintln!("Found upvalue for {name}: {upvalue:?}");
+
+                let current_frame = &mut self.frames[frame_index];
+                let upvalue_index = current_frame.upvalues.len();
+                current_frame.upvalues.push(upvalue);
+
+                // This is the upvalue that goes into the ident
+                Some(IdentLocation::Upvalue(upvalue_index))
+            } else {
+                None
+            }
         }
+    }
+
+    #[derive(Debug, Default)]
+    pub struct CallFrame {
+        scopes: NEVec<Scope>,
+        upvalues: Vec<Upvalue>,
     }
 
     #[clippy::has_significant_drop]
     pub struct ScopeGuard<'a>(&'a mut Env);
     impl<'a> ScopeGuard<'a> {
         fn new(env: &'a mut Env) -> Self {
-            env.locals.last_mut().push(Vec::new());
+            env.frames.last_mut().scopes.push(Vec::new());
             ScopeGuard(env)
         }
     }
@@ -110,7 +150,7 @@ mod env {
     }
     impl Drop for ScopeGuard<'_> {
         fn drop(&mut self) {
-            self.0.locals.last_mut().pop_unchecked();
+            self.frames.last_mut().scopes.pop_unchecked();
         }
     }
 
@@ -118,8 +158,16 @@ mod env {
     pub struct FrameGuard<'a>(&'a mut Env);
     impl<'a> FrameGuard<'a> {
         fn new(env: &'a mut Env) -> Self {
-            env.locals.push(NEVec::default());
+            env.frames.push(CallFrame::default());
             FrameGuard(env)
+        }
+
+        // Take `self` so that upvalues must be up-to-date.
+        pub fn upvalues(mut self) -> Vec<Upvalue> {
+            let upvalues = self.frames.pop_unchecked().upvalues;
+            // prevent destructor from double-popping
+            std::mem::forget(self);
+            upvalues
         }
     }
     impl Deref for FrameGuard<'_> {
@@ -136,7 +184,7 @@ mod env {
     }
     impl Drop for FrameGuard<'_> {
         fn drop(&mut self) {
-            self.0.locals.pop_unchecked();
+            self.frames.pop_unchecked();
         }
     }
 
@@ -200,7 +248,7 @@ impl Parser {
 
         if is_func {
             // Insert the var *before* parsing body so that it can be recursive
-            env.declare_local(name);
+            env.declare_local(name.clone());
 
             let mut env = env.new_frame();
 
@@ -216,10 +264,16 @@ impl Parser {
             self.expect(TokenData::Equals)?;
 
             let value = self.parse_expr(&mut env)?;
+            let upvalues = env.upvalues();
+
+            eprintln!("Upvalues for {name}: {upvalues:#?}");
 
             Ok(Binding {
                 pattern,
-                arguments: Some(arguments),
+                metadata: BindingMetadata::Func {
+                    arguments,
+                    upvalues,
+                },
                 value,
             })
         } else {
@@ -230,7 +284,7 @@ impl Parser {
 
             Ok(Binding {
                 pattern,
-                arguments: None,
+                metadata: BindingMetadata::Var,
                 value,
             })
         }
@@ -372,21 +426,33 @@ impl Parser {
             Ok(Expr::If(Box::new(if_expr)))
         } else {
             self.consume_map(
-                |t| match &t.data {
-                    TokenData::True => Some(Literal(Bool(true))),
-                    TokenData::False => Some(Literal(Bool(false))),
-                    TokenData::Number(n) => Some(Literal(Number(*n))),
-                    TokenData::Str(s) => Some(Literal(Str(s.clone()))),
-                    TokenData::Nil => Some(Literal(Nil)),
-                    TokenData::Identifier(name) => {
-                        let stack_index = env.resolve(name);
-                        let identifier = Identifier::new(name.clone()).resolve(stack_index);
-                        Some(Expr::Identifier(identifier))
-                    }
-                    _ => None,
+                |t| {
+                    Some(Ok(match &t.data {
+                        TokenData::True => Literal(Bool(true)),
+                        TokenData::False => Literal(Bool(false)),
+                        TokenData::Number(n) => Literal(Number(*n)),
+                        TokenData::Str(s) => Literal(Str(s.clone())),
+                        TokenData::Nil => Literal(Nil),
+                        TokenData::Identifier(name) => {
+                            let location = match env.resolve(name) {
+                                Some(l) => l,
+                                None => {
+                                    return Some(Err(Error {
+                                        pos: Some(t.pos),
+                                        kind: ErrorKind::VarNotInScope {
+                                            identifier: Identifier::new(name.clone()),
+                                        },
+                                    }))
+                                }
+                            };
+                            let identifier = Identifier::new(name.clone()).resolve(location);
+                            return Some(Ok(Expr::Identifier(identifier)));
+                        }
+                        _ => return None,
+                    }))
                 },
                 ErrorKind::ExpectedPrimary,
-            )
+            )?
         }
     }
 
@@ -450,7 +516,7 @@ impl Parser {
         self.tokens.advance_if(|t| &t.data == expected_type)
     }
 
-    fn consume_map<U>(&mut self, f: impl Fn(&Token) -> Option<U>, err: ErrorKind) -> Parse<U> {
+    fn consume_map<U>(&mut self, f: impl FnOnce(&Token) -> Option<U>, err: ErrorKind) -> Parse<U> {
         self.tokens.next_if_map(f).ok_or_else(|| Error {
             pos: self.tokens.peek().map(|t| t.pos),
             kind: err,
