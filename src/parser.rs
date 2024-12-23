@@ -353,7 +353,7 @@ impl Parser {
         let mut stmts = vec![];
         let mut expr = None;
         while !self.matches(&TokenData::CloseBrace) {
-            let stmt_or_expr = self.parse_stmt_or_expr(&mut *env)?;
+            let stmt_or_expr = self.parse_stmt_or_expr(&mut env)?;
             match stmt_or_expr {
                 StmtOrExpr::Stmt(stmt) => stmts.push(stmt),
                 StmtOrExpr::Expr(e) => {
