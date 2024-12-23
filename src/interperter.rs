@@ -23,9 +23,11 @@ mod env {
 
     impl Env {
         pub fn new() -> Self {
-            Env {
+            let mut env = Env {
                 locals_stack: Vec::new(),
-            }
+            };
+            super::stdlib::define_stdlib(&mut env);
+            env
         }
 
         pub fn get(&self, i: usize) -> &Value {

@@ -1,6 +1,4 @@
-use std::{collections::HashSet, io::Write};
-
-use crate::ast::Identifier;
+use std::io::Write;
 
 use super::{Error, ErrorKind, Func, NativeFunc, Value};
 
@@ -31,38 +29,39 @@ pub fn stub_stdlib(env: &mut crate::parser::Env) {
     );
 }
 
-fn define_stdlib() {
-    macro_rules! native_func {
-        ($struct_name:ident, $func_def:ident) => {
+pub fn define_stdlib(env: &mut super::Env) {
+    macro_rules! define {
+        ($func:ident) => {{
             #[derive(Debug)]
-            struct $struct_name;
-            impl $struct_name {
-                fn define() {
-                    let identifier = Identifier::new(stringify!($func_def).to_string());
-                    todo!("define");
-                }
-            }
-            impl NativeFunc for $struct_name {
+            struct F;
+            impl NativeFunc for F {
                 fn call(&self, arguments: Vec<Value>) -> super::Result<Value> {
-                    $func_def(arguments)
+                    $func(arguments)
                 }
             }
-            $struct_name::define();
-        };
+            env.define(Value::Func(Func::Native(&F)));
+        }};
+
+        ($func:ident, $($funcs:ident),+) => {
+            define!($func);
+            define!($($funcs),+);
+        }
     }
 
-    native_func!(PrintFunc, print);
-    native_func!(InputFunc, input);
-    native_func!(NumFromStrFunc, num_from_str);
-    native_func!(ListFunc, list);
-    native_func!(ListGetFunc, list_get);
-    native_func!(ListSetFunc, list_set);
-    native_func!(ListPushFunc, list_push);
-    native_func!(ListLenFunc, list_len);
-    native_func!(StrToCharsFunc, str_to_chars);
-    native_func!(StrFromCharsFunc, str_from_chars);
-    native_func!(ReadFileFunc, read_file);
-    native_func!(ReadFileLinesFunc, read_file_lines);
+    define!(
+        print,
+        input,
+        num_from_str,
+        list,
+        list_get,
+        list_set,
+        list_push,
+        list_len,
+        str_to_chars,
+        str_from_chars,
+        read_file,
+        read_file_lines
+    );
 }
 
 fn print(arguments: Vec<Value>) -> super::Result<Value> {

@@ -34,7 +34,7 @@ mod env {
                 locals: vec![Vec::new()],
             };
 
-            // crate::interperter::stub_stdlib(&mut env);
+            crate::interperter::stub_stdlib(&mut env);
             // new scope for non-stdlib
             env.locals.push(Vec::new());
 
