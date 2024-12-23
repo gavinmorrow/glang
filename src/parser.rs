@@ -23,6 +23,7 @@ struct Parser {
 mod env {
     use std::ops::{Deref, DerefMut};
 
+    #[derive(Debug)]
     pub struct Env {
         locals: Vec<Vec<Local>>,
     }
@@ -70,7 +71,7 @@ mod env {
             let indexes_rev = (0..len).rev();
 
             let mut stack = stack.rev().zip(indexes_rev);
-            let local = dbg!(stack)
+            let local = stack
                 .find(|(local, _)| local.name == name)
                 .expect("resolved local should exist on stack");
 
