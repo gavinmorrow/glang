@@ -23,15 +23,20 @@ struct Parser {
 mod env {
     use std::ops::{Deref, DerefMut};
 
+    type Scope = Vec<Local>;
+    type CallFrame = Vec<Scope>;
+
     #[derive(Debug)]
     pub struct Env {
-        locals: Vec<Vec<Local>>,
+        /// A list of call frames, which is a list of blocks, each with a list
+        /// of locals.
+        locals: Vec<CallFrame>,
     }
 
     impl Env {
         pub fn new() -> Self {
             let mut env = Env {
-                locals: vec![Vec::new()],
+                locals: vec![vec![vec![]]],
             };
 
             crate::interperter::stub_stdlib(&mut env);
@@ -57,6 +62,8 @@ mod env {
             };
             self.locals
                 .last_mut()
+                .expect("should be at least one call frame")
+                .last_mut()
                 .expect("scope should exist")
                 .push(local);
         }
@@ -66,7 +73,11 @@ mod env {
             // This was much more annoying than I thought it would be
             // <https://users.rust-lang.org/t/cant-flatten-enumerate-and-then-reverse-iterator/122931>
 
-            let stack = self.locals.iter().flatten();
+            let call_frame = self
+                .locals
+                .last()
+                .expect("should be at least one call frame");
+            let stack = call_frame.iter().flatten();
             let len = stack.clone().count();
             let indexes_rev = (0..len).rev();
 
@@ -77,13 +88,20 @@ mod env {
 
             local.1
         }
+
+        pub fn new_frame(&mut self) -> FrameGuard<'_> {
+            FrameGuard::new(self)
+        }
     }
 
     #[clippy::has_significant_drop]
     pub struct ScopeGuard<'a>(&'a mut Env);
     impl<'a> ScopeGuard<'a> {
         fn new(env: &'a mut Env) -> Self {
-            env.locals.push(Vec::new());
+            env.locals
+                .last_mut()
+                .expect("should have at least one call frame")
+                .push(Vec::new());
             ScopeGuard(env)
         }
     }
@@ -101,7 +119,41 @@ mod env {
     }
     impl Drop for ScopeGuard<'_> {
         fn drop(&mut self) {
-            self.0.locals.pop().expect("scope should exist");
+            self.0
+                .locals
+                .last_mut()
+                .expect("should have at least one call frame")
+                .pop()
+                .expect("scope should exist");
+        }
+    }
+
+    #[clippy::has_significant_drop]
+    pub struct FrameGuard<'a>(&'a mut Env);
+    impl<'a> FrameGuard<'a> {
+        fn new(env: &'a mut Env) -> Self {
+            env.locals.push(vec![vec![]]);
+            FrameGuard(env)
+        }
+    }
+    impl Deref for FrameGuard<'_> {
+        type Target = Env;
+
+        fn deref(&self) -> &Self::Target {
+            self.0
+        }
+    }
+    impl DerefMut for FrameGuard<'_> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            self.0
+        }
+    }
+    impl Drop for FrameGuard<'_> {
+        fn drop(&mut self) {
+            self.0
+                .locals
+                .pop()
+                .expect("outer frame should exist to pop");
         }
     }
 
@@ -159,38 +211,45 @@ impl Parser {
 
     fn parse_binding(&mut self, env: &mut Env) -> Parse<Binding> {
         let pattern = self.parse_pattern(env)?;
+        let name = pattern.0.name.clone();
 
-        let arguments = if self.matches(&TokenData::OpenParen) {
-            Some(self.parse_arguments(
+        let is_func = self.matches(&TokenData::OpenParen);
+
+        if is_func {
+            let mut env = env.new_frame();
+
+            let arguments = self.parse_arguments(
                 |parser, env| -> Parse<Pattern> {
                     let pattern = parser.parse_pattern(env)?;
-                    todo!("define arg var");
+                    env.declare_local(pattern.0.name.clone());
                     Ok(pattern)
                 },
-                env,
-            )?)
-        } else {
-            None
-        };
+                &mut env,
+            )?;
 
-        self.expect(TokenData::Equals)?;
+            self.expect(TokenData::Equals)?;
 
-        let is_func = arguments.is_some();
-        let name = pattern.0.name.clone();
-        let value = if is_func {
             // Insert the var *before* so that the function can be recursive
             env.declare_local(name);
-            self.parse_expr(env)?
-        } else {
-            // Insert the var *after* so that variable shadowing works
-            self.parse_expr(env).inspect(|_| env.declare_local(name))?
-        };
+            let value = self.parse_expr(&mut env)?;
 
-        Ok(Binding {
-            pattern,
-            arguments,
-            value,
-        })
+            Ok(Binding {
+                pattern,
+                arguments: Some(arguments),
+                value,
+            })
+        } else {
+            self.expect(TokenData::Equals)?;
+
+            // Insert the var *after* so that variable shadowing works
+            let value = self.parse_expr(env).inspect(|_| env.declare_local(name))?;
+
+            Ok(Binding {
+                pattern,
+                arguments: None,
+                value,
+            })
+        }
     }
 
     fn parse_pattern(&mut self, env: &mut Env) -> Parse<Pattern> {
