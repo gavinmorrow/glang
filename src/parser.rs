@@ -18,7 +18,6 @@ pub type Parse<T> = Result<T, Error>;
 
 struct Parser {
     tokens: Stream<Token>,
-    env: Env,
 }
 
 mod env {
@@ -117,7 +116,6 @@ impl Parser {
     fn new(tokens: Vec<Token>) -> Self {
         Parser {
             tokens: Stream::new(tokens),
-            env: Env::new(),
         }
     }
 }
@@ -180,12 +178,11 @@ impl Parser {
         let name = pattern.0.name.clone();
         let value = if is_func {
             // Insert the var *before* so that the function can be recursive
-            self.env.declare_local(name);
+            env.declare_local(name);
             self.parse_expr(env)?
         } else {
             // Insert the var *after* so that variable shadowing works
-            self.parse_expr(env)
-                .inspect(|_| self.env.declare_local(name))?
+            self.parse_expr(env).inspect(|_| env.declare_local(name))?
         };
 
         Ok(Binding {
