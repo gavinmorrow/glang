@@ -43,7 +43,10 @@ mod env {
 
             self.locals_stack
                 .get(offset + i)
-                .expect("index provided by parser is valid")
+                .unwrap_or_else(|| panic!(
+                    "index provided by parser should be valid. index: {i}, offset: {offset}, stack: {:#?}",
+                    self.locals_stack
+                ))
         }
 
         pub fn define(&mut self, value: Value) {
@@ -86,8 +89,13 @@ mod env {
     }
     impl Drop for FrameGuard<'_> {
         fn drop(&mut self) {
-            self.0
+            let offset = self
                 .call_frames
+                .last()
+                .expect("env should have call frame")
+                .stack_offset;
+            self.locals_stack.drain(offset..);
+            self.call_frames
                 .pop()
                 .expect("env should have call frame to pop");
         }
@@ -174,26 +182,23 @@ impl Evaluate for Call {
             }));
         };
 
+        let arguments: Vec<Value> = self
+            .arguments
+            .iter()
+            .map(|value| value.evaluate(env))
+            .collect::<Result<_>>()?;
+
+        // Create new frame *after* evaluating arguments
         let mut env = env.new_frame(func.clone());
 
         match func {
             Func::User(func) => {
-                for (_pattern, value) in zip(func.arguments, &self.arguments) {
-                    let value = value.evaluate(&mut env)?;
-                    env.define(value);
-                }
+                // Actually define arguments
+                arguments.into_iter().for_each(|v| env.define(v));
 
-                // Evaluate function body
                 func.body.evaluate(&mut env)
             }
-            Func::Native(func) => {
-                let mut arguments = vec![];
-                for argument in &self.arguments {
-                    let argument = argument.evaluate(&mut env)?;
-                    arguments.push(argument);
-                }
-                func.call(arguments)
-            }
+            Func::Native(func) => func.call(arguments),
         }
     }
 }
@@ -291,6 +296,7 @@ impl Evaluate for Literal {
 
 impl Evaluate for Identifier {
     fn evaluate(&self, env: &mut Env) -> Result<Value> {
+        eprintln!("Evaluating {self:#?}");
         Ok(env
             .get(
                 self.stack_index

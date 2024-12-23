@@ -5,6 +5,7 @@ mod interperter;
 mod lexer;
 mod parser;
 mod stream;
+mod util;
 
 fn main() {
     let mut args = std::env::args();
