@@ -26,8 +26,7 @@ pub enum BindingMetadata {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Upvalue {
-    pub index: usize,
-    pub is_local: bool,
+    pub target: IdentLocation,
 }
 
 #[derive(Clone, Debug)]
@@ -128,6 +127,12 @@ impl Identifier {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum IdentLocation {
-    Stack(usize),
-    Upvalue(usize),
+    Stack(StackIndex),
+    Upvalue(UpvalueIndex),
 }
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct StackIndex(pub usize);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct UpvalueIndex(pub usize);

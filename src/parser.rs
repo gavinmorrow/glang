@@ -24,7 +24,7 @@ mod env {
     use std::ops::{Deref, DerefMut};
 
     use crate::{
-        ast::{IdentLocation, Upvalue},
+        ast::{IdentLocation, StackIndex, Upvalue, UpvalueIndex},
         util::nonempty_vec::NEVec,
     };
 
@@ -83,42 +83,49 @@ mod env {
             name: &str,
             frame_index: usize,
         ) -> Option<IdentLocation> {
+            self.resolve_in_stack_with_frame(name, frame_index)
+                .map(IdentLocation::Stack)
+                .or(self
+                    .resolve_upvalue_with_frame(name, frame_index)
+                    .map(IdentLocation::Upvalue))
+        }
+
+        fn resolve_in_stack_with_frame(
+            &mut self,
+            name: &str,
+            frame_index: usize,
+        ) -> Option<StackIndex> {
             // This was much more annoying than I thought it would be
             // <https://users.rust-lang.org/t/cant-flatten-enumerate-and-then-reverse-iterator/122931>
 
             let call_frame = &self.frames[frame_index];
             let stack = call_frame.scopes.iter().flatten();
             let len = stack.clone().count();
-            let indexes_rev = (0..len).rev();
+            let indexes_rev = (0..len).map(StackIndex).rev();
 
             let mut stack = stack.rev().zip(indexes_rev);
-            if let Some((_, i)) = stack.find(|(local, _)| local.name == name) {
-                eprintln!("found {name} in stack. i: {i}");
-                Some(IdentLocation::Stack(i))
-            } else if let Some(parent_index) = frame_index.checked_sub(1) {
-                // make upvalue
-                let location = self.resolve_with_frame(name, parent_index)?;
-                let (location, is_local) = match location {
-                    IdentLocation::Stack(i) => (i, true),
-                    IdentLocation::Upvalue(i) => (i, false),
-                };
+            stack.find(|(local, _)| local.name == name).map(|(_, i)| i)
+        }
 
-                // This is the upvalue that goes in the func metadata
-                let upvalue = Upvalue {
-                    index: location,
-                    is_local,
-                };
-                eprintln!("Found upvalue for {name}: {upvalue:?}");
+        fn resolve_upvalue_with_frame(
+            &mut self,
+            name: &str,
+            frame_index: usize,
+        ) -> Option<UpvalueIndex> {
+            let parent_index = frame_index.checked_sub(1)?;
 
-                let current_frame = &mut self.frames[frame_index];
-                let upvalue_index = current_frame.upvalues.len();
-                current_frame.upvalues.push(upvalue);
+            // make upvalue
+            let location = self.resolve_with_frame(name, parent_index)?;
 
-                // This is the upvalue that goes into the ident
-                Some(IdentLocation::Upvalue(upvalue_index))
-            } else {
-                None
-            }
+            // This is the upvalue that goes in the func metadata
+            let upvalue = Upvalue { target: location };
+            eprintln!("Found upvalue for {name}: {upvalue:?}");
+
+            let current_frame = &mut self.frames[frame_index];
+            let upvalue_index = UpvalueIndex(current_frame.upvalues.len());
+            current_frame.upvalues.push(upvalue);
+
+            Some(upvalue_index)
         }
     }
 

@@ -15,7 +15,7 @@ pub fn interpert(program: Program, env: &mut Env) -> Result<Value> {
 mod env {
     use std::ops::{Deref, DerefMut};
 
-    use crate::ast::{IdentLocation, Upvalue};
+    use crate::ast::{IdentLocation, StackIndex, Upvalue, UpvalueIndex};
 
     use super::{Func, Value};
 
@@ -50,11 +50,11 @@ mod env {
                             panic!("call frame should not be native func");
                         };
 
-                        &func.upvalues[upvalue_index]
+                        &func.upvalues[upvalue_index.0]
                     } else {
                         // a global
-                        eprintln!("getting global {upvalue_index}");
-                        &self.locals_stack[upvalue_index]
+                        eprintln!("getting global {upvalue_index:?}");
+                        &self.locals_stack[upvalue_index.0]
                     }
                 }
             }
@@ -66,14 +66,21 @@ mod env {
                 "resolving arg {upvalue:?} in frame {}",
                 current_frame.map(|f| f.stack_offset).unwrap_or(0)
             );
-            if upvalue.is_local {
-                self.get_local_from_frame(upvalue.index, current_frame)
-            } else {
-                self.get_upvalue_from_frame(upvalue.index, current_frame)
+            match upvalue.target {
+                IdentLocation::Stack(stack_index) => {
+                    self.get_local_from_frame(stack_index, current_frame)
+                }
+                IdentLocation::Upvalue(upvalue_index) => {
+                    self.get_upvalue_from_frame(upvalue_index, current_frame)
+                }
             }
         }
 
-        fn get_local_from_frame(&self, i: usize, frame: Option<&CallFrame>) -> &Value {
+        fn get_local_from_frame(
+            &self,
+            StackIndex(i): StackIndex,
+            frame: Option<&CallFrame>,
+        ) -> &Value {
             let stack_offset = frame.map(|f| f.stack_offset).unwrap_or(0);
             self.locals_stack.get(stack_offset + i).unwrap_or_else(|| {
                 panic!(
@@ -83,7 +90,11 @@ mod env {
             })
         }
 
-        fn get_upvalue_from_frame<'f>(&self, i: usize, frame: Option<&'f CallFrame>) -> &'f Value {
+        fn get_upvalue_from_frame<'f>(
+            &self,
+            UpvalueIndex(i): UpvalueIndex,
+            frame: Option<&'f CallFrame>,
+        ) -> &'f Value {
             let Func::User(func) = &frame.expect("frame should exist for upvalue").func else {
                 panic!("call frame should not be native func");
             };
