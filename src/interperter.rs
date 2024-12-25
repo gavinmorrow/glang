@@ -192,7 +192,7 @@ impl Evaluate for Binding {
                 let arguments = arguments.clone();
                 let upvalues = upvalues
                     .iter()
-                    .map(|&upvalue| env.resolve_upvalue(upvalue).clone())
+                    .map(|upvalue| env.resolve_upvalue(upvalue.clone()).clone())
                     .collect();
                 let body = self.value.clone();
                 Value::Func(Func::User(UserFunc {

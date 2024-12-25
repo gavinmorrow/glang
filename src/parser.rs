@@ -120,7 +120,10 @@ mod env {
             let location = self.resolve_with_frame(name, parent_index)?;
 
             // This is the upvalue that goes in the func metadata
-            let upvalue = Upvalue { target: location };
+            let upvalue = Upvalue {
+                target: location,
+                dbg_name: name.to_string(),
+            };
             eprintln!("Found upvalue for {name}: {upvalue:?}");
 
             let current_frame = &mut self.frames[frame_index];

@@ -24,9 +24,10 @@ pub enum BindingMetadata {
     },
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Upvalue {
     pub target: IdentLocation,
+    pub dbg_name: String,
 }
 
 #[derive(Clone, Debug)]
