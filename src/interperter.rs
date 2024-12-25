@@ -35,13 +35,8 @@ mod env {
         }
 
         pub fn get(&self, i: IdentLocation) -> &Value {
-            eprintln!(
-                "getting from env {i:?} offset {}",
-                self.call_frames.last().map(|f| f.stack_offset).unwrap_or(0)
-            );
             match i {
                 IdentLocation::Stack(i) => self.get_local_from_frame(i, self.call_frames.last()),
-
                 IdentLocation::Upvalue(upvalue_index) => {
                     if let Some(frame_index) = (self.call_frames.len()).checked_sub(1) {
                         let frame = &self.call_frames[frame_index];
@@ -53,7 +48,6 @@ mod env {
                         &func.upvalues[upvalue_index.0]
                     } else {
                         // a global
-                        eprintln!("getting global {upvalue_index:?}");
                         &self.locals_stack[upvalue_index.0]
                     }
                 }
@@ -62,10 +56,6 @@ mod env {
 
         pub fn resolve_upvalue(&self, upvalue: Upvalue) -> &Value {
             let current_frame = self.call_frames.last();
-            eprintln!(
-                "resolving arg {upvalue:?} in frame {}",
-                current_frame.map(|f| f.stack_offset).unwrap_or(0)
-            );
             match upvalue.target {
                 IdentLocation::Stack(stack_index) => {
                     self.get_local_from_frame(stack_index, current_frame)
@@ -366,7 +356,6 @@ impl Evaluate for Literal {
 
 impl Evaluate for Identifier {
     fn evaluate(&self, env: &mut Env) -> Result<Value> {
-        eprintln!("evaluating ident {:?}", self.name);
         Ok(env
             .get(self.location.expect("parser should have resolved variable"))
             .clone())

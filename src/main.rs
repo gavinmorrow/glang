@@ -37,7 +37,7 @@ fn run(source: String, env: &mut (parser::Env, interperter::Env)) {
     // println!("{tokens:#?}");
 
     let ast = parser::parse(tokens, &mut env.0);
-    dbg!(&ast);
+    // dbg!(&ast);
 
     match ast {
         Ok(ast) => {

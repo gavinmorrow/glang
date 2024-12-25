@@ -75,7 +75,6 @@ mod env {
             name: &str,
             frame_index: usize,
         ) -> Option<IdentLocation> {
-            eprintln!("Resolving {name:#?} in frame {frame_index}");
             self.resolve_in_stack_with_frame(name, frame_index)
                 .map(IdentLocation::Stack)
                 .or_else(|| {
@@ -116,7 +115,6 @@ mod env {
                 target: location,
                 dbg_name: name.to_string(),
             };
-            eprintln!("Found upvalue for {name}: {upvalue:?}");
 
             let current_frame = &mut self.frames[frame_index];
             let upvalue_index = UpvalueIndex(current_frame.upvalues.len());
@@ -271,8 +269,6 @@ impl Parser {
 
             let value = self.parse_expr(&mut env)?;
             let upvalues = env.upvalues();
-
-            eprintln!("Upvalues for {name}: {upvalues:#?}");
 
             Ok(Binding {
                 pattern,
