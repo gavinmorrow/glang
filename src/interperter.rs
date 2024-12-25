@@ -4,8 +4,8 @@ pub use env::Env;
 pub use stdlib::stub_stdlib;
 
 use crate::ast::{
-    BinaryExpr, BinaryOp, Binding, BindingMetadata, Block, Call, ElseBlock, Expr, IdentLocation,
-    Identifier, IfExpr, Literal, Pattern, Program, Stmt, UnaryExpr, UnaryOp,
+    BinaryExpr, BinaryOp, Binding, BindingMetadata, Block, Call, ElseBlock, Expr, Identifier,
+    IfExpr, Literal, Pattern, Program, Stmt, UnaryExpr, UnaryOp,
 };
 
 pub fn interpert(program: Program, env: &mut Env) -> Result<Value> {
@@ -177,8 +177,6 @@ impl Evaluate for Stmt {
 
 impl Evaluate for Binding {
     fn evaluate(&self, env: &mut Env) -> Result<Value> {
-        let identifier = self.pattern.0.clone();
-
         let value = match &self.metadata {
             // Don't `.evaluate()` anything for a function
             BindingMetadata::Func {
@@ -241,6 +239,18 @@ impl Evaluate for Call {
                 actual: func.into(),
             }));
         };
+
+        if let Func::User(func) = func.clone() {
+            let incorrect_arity = func.arguments.len() > self.arguments.len();
+            if incorrect_arity {
+                return Err(Error {
+                    kind: ErrorKind::IncorrectArity {
+                        given: self.arguments.len(),
+                        correct: func.arguments.len(),
+                    },
+                });
+            }
+        }
 
         let arguments: Vec<Value> = self
             .arguments
