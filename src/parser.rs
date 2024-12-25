@@ -83,11 +83,13 @@ mod env {
             name: &str,
             frame_index: usize,
         ) -> Option<IdentLocation> {
+            eprintln!("Resolving {name:#?} in frame {frame_index}");
             self.resolve_in_stack_with_frame(name, frame_index)
                 .map(IdentLocation::Stack)
-                .or(self
-                    .resolve_upvalue_with_frame(name, frame_index)
-                    .map(IdentLocation::Upvalue))
+                .or_else(|| {
+                    self.resolve_upvalue_with_frame(name, frame_index)
+                        .map(IdentLocation::Upvalue)
+                })
         }
 
         fn resolve_in_stack_with_frame(
