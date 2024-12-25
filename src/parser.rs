@@ -50,11 +50,6 @@ mod env {
             env
         }
 
-        pub fn scope_depth(&self) -> usize {
-            assert!(!self.frames.is_empty());
-            self.frames.len() - 1
-        }
-
         pub fn create_scope(&mut self) -> ScopeGuard<'_> {
             ScopeGuard::new(self)
         }
@@ -64,10 +59,7 @@ mod env {
         }
 
         pub fn declare_local(&mut self, name: String) {
-            let local = Local {
-                name,
-                depth: self.scope_depth(),
-            };
+            let local = Local { name };
             self.frames.last_mut().scopes.last_mut().push(local);
         }
 
@@ -203,7 +195,6 @@ mod env {
     #[derive(Debug)]
     struct Local {
         name: String,
-        depth: usize,
     }
 }
 
