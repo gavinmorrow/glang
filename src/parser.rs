@@ -54,8 +54,8 @@ mod env {
             ScopeGuard::new(self)
         }
 
-        pub fn new_frame(&mut self) -> FrameGuard<'_> {
-            FrameGuard::new(self)
+        pub fn new_frame(&mut self, name: String) -> FrameGuard<'_> {
+            FrameGuard::new(self, name)
         }
 
         pub fn declare_local(&mut self, name: String) {
@@ -161,8 +161,13 @@ mod env {
     #[clippy::has_significant_drop]
     pub struct FrameGuard<'a>(&'a mut Env);
     impl<'a> FrameGuard<'a> {
-        fn new(env: &'a mut Env) -> Self {
+        fn new(env: &'a mut Env, name: String) -> Self {
             env.frames.push(CallFrame::default());
+
+            // declare the function name in locals slot 0
+            // this will allow for recursion
+            env.declare_local(name);
+
             FrameGuard(env)
         }
 
@@ -250,10 +255,8 @@ impl Parser {
         let is_func = self.matches(&TokenData::OpenParen);
 
         if is_func {
-            // Insert the var *before* parsing body so that it can be recursive
             env.declare_local(name.clone());
-
-            let mut env = env.new_frame();
+            let mut env = env.new_frame(name.clone());
 
             let arguments = self.parse_arguments(
                 |parser, env| -> Parse<Pattern> {

@@ -121,8 +121,14 @@ mod env {
     impl<'a> FrameGuard<'a> {
         fn new(env: &'a mut Env, func: Func) -> Self {
             let stack_offset = env.locals_stack.len();
-            let call_frame = CallFrame { func, stack_offset };
+            let call_frame = CallFrame {
+                func: func.clone(),
+                stack_offset,
+            };
             env.call_frames.push(call_frame);
+
+            // put func in slot 0, to allow for recursion
+            env.define(Value::Func(func));
 
             FrameGuard(env)
         }
