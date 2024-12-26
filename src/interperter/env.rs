@@ -79,6 +79,34 @@ impl Env {
     pub fn new_frame(&mut self, func: Func) -> FrameGuard {
         FrameGuard::new(self, func)
     }
+
+    pub fn tail_call(&mut self, func: Func, arguments: Vec<Value>) {
+        let frame = self
+            .call_frames
+            .last_mut()
+            .expect("tail call should be within call frame");
+        frame.func = func.clone();
+
+        // clear stack up
+        self.clear_call_frame_stack();
+
+        // put func in slot 0, to allow for recursion
+        self.define(Value::Func(func));
+
+        // define args
+        for arg in arguments {
+            self.define(arg);
+        }
+    }
+
+    fn clear_call_frame_stack(&mut self) {
+        let offset = self
+            .call_frames
+            .last()
+            .map(|frame| frame.stack_offset)
+            .unwrap_or(0);
+        self.locals_stack.drain(offset..);
+    }
 }
 
 #[derive(Debug)]
@@ -103,6 +131,14 @@ impl<'a> FrameGuard<'a> {
 
         FrameGuard(env)
     }
+
+    pub fn func(&self) -> &Func {
+        &self
+            .call_frames
+            .last()
+            .expect("frame guard should have call frame")
+            .func
+    }
 }
 impl Deref for FrameGuard<'_> {
     type Target = Env;
@@ -118,12 +154,7 @@ impl DerefMut for FrameGuard<'_> {
 }
 impl Drop for FrameGuard<'_> {
     fn drop(&mut self) {
-        let offset = self
-            .call_frames
-            .last()
-            .expect("env should have call frame")
-            .stack_offset;
-        self.locals_stack.drain(offset..);
+        self.clear_call_frame_stack();
 
         self.call_frames
             .pop()

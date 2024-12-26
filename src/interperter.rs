@@ -93,6 +93,7 @@ impl Evaluate for Block {
 }
 
 impl Evaluate for Call {
+    // TODO: split into seperate for user and native?
     fn evaluate(&self, env: &mut Env) -> Result<Value> {
         let func = self.target.evaluate(env)?;
         let Value::Func(func) = func else {
@@ -120,17 +121,32 @@ impl Evaluate for Call {
             .map(|value| value.evaluate(env))
             .collect::<Result<_>>()?;
 
+        // Don't tail call for native funcs b/c they handle args differently
+        if self.is_tail_call && matches!(func, Func::User(_)) {
+            env.tail_call(func, arguments);
+            return Ok(Value::TailCall);
+        }
+
         // Create new frame *after* evaluating arguments
         let mut env = env.new_frame(func.clone());
 
-        match func {
-            Func::User(func) => {
-                // Actually define arguments
-                arguments.into_iter().for_each(|v| env.define(v));
+        // Actually define arguments
+        for arg in arguments.clone() {
+            env.define(arg);
+        }
 
-                func.body.evaluate(&mut env)
+        loop {
+            let ret = match env.func().clone() {
+                Func::User(func) => func.body.evaluate(&mut env)?,
+                // native funcs don't support tce
+                Func::Native(func) => break func.call(arguments),
+            };
+
+            if let Value::TailCall = ret {
+                continue;
+            } else {
+                break Ok(ret);
             }
-            Func::Native(func) => func.call(arguments),
         }
     }
 }
@@ -242,6 +258,9 @@ pub enum Value {
     Func(Func),
     List(Vec<Value>),
     Nil,
+
+    /// Indicates that a tail call should be performed
+    TailCall,
 }
 
 impl Value {
@@ -348,6 +367,7 @@ pub enum DiagnosticType {
     Func,
     List,
     Nil,
+    TailCall,
 }
 impl From<&Value> for DiagnosticType {
     fn from(value: &Value) -> Self {
@@ -358,6 +378,7 @@ impl From<&Value> for DiagnosticType {
             Value::Func(_) => Self::Func,
             Value::List(_) => Self::List,
             Value::Nil => Self::Nil,
+            Value::TailCall => Self::TailCall,
         }
     }
 }
