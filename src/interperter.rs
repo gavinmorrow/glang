@@ -81,11 +81,11 @@ impl Evaluate for Expr {
 
 impl Evaluate for Block {
     fn evaluate(&self, env: &mut Env) -> Result<Value> {
-        for stmt in &self.0 {
+        for stmt in &self.stmts {
             stmt.evaluate(env)?;
         }
 
-        self.1
+        self.return_expr
             .as_ref()
             .map(|e| e.evaluate(env))
             .unwrap_or(Ok(Value::Nil))
