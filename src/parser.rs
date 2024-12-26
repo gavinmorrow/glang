@@ -203,15 +203,17 @@ impl Parser {
     }
 
     fn parse_call(&mut self, env: &mut Env) -> Parse<Expr> {
-        let target = self.parse_primary(env)?;
+        let mut target = self.parse_primary(env)?;
 
-        if !self.matches(&TokenData::OpenParen) {
-            return Ok(target);
+        while self.matches(&TokenData::OpenParen) {
+            let arguments = self.parse_arguments(Self::parse_expr, env)?;
+            target = Expr::Call(Call {
+                target: Box::new(target),
+                arguments,
+            });
         }
 
-        let arguments = self.parse_arguments(Self::parse_expr, env)?;
-        let target = Box::new(target);
-        Ok(Expr::Call(Call { target, arguments }))
+        Ok(target)
     }
 
     fn parse_arguments<T>(
