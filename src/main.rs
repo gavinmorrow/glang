@@ -22,7 +22,7 @@ fn main() {
 
 fn run_repl() {
     // start repl
-    eprintln!("glang v0.1.0");
+    eprintln!("qua v0.1.0");
     let mut env = (parser::Env::new(), interperter::Env::new());
     eprint!("> ");
     while let Some(Ok(line)) = io::stdin().lines().next() {

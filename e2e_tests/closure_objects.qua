@@ -1,0 +1,22 @@
+let Vector(x, y) = {
+  let dispatch(method) = {
+    if method == "x" {
+      x
+    } else if method == "y" {
+      y
+    } else if method == "add" {
+      let add(other) = {
+        Vector(x + other("x"), y + other("y"))
+      };
+      add
+    }
+  };
+  dispatch
+};
+
+let a = Vector(6, 8);
+let b = Vector(22, 42);
+let a_plus = a("add");
+let c = a_plus(b);
+print("(" + c("x") + ", " + c("y") + ")");
+//-> (28, 50)

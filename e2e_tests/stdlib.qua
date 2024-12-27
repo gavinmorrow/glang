@@ -1,0 +1,39 @@
+let fold(list, fn, initial_value) = {
+  let fold(list, acc, i) = {
+    let elem = list_get(list, i);
+    if elem == nil {
+      acc
+    } else {
+      let acc = fn(acc, elem, i, list);
+      fold(list, acc, i + 1)
+    }
+  };
+  fold(list, initial_value, 0)
+};
+
+let map(list, fn) = {
+  let map(list, i) = {
+    if i >= list_len(list) {
+      list
+    } else {
+      let elem = list_get(list, i);
+      let elem = fn(elem, i, list);
+      let list = list_set(list, i, elem);
+      map(list, i + 1)
+    }
+  };
+
+  map(list, 0)
+};
+
+let nums = list(42, 0, -5, 22, 2, 4, 8, 16, 32);
+let sum(a, b) = a + b;
+let sum_of_nums = fold(nums, sum, 0);
+print(sum_of_nums);
+//-> 121
+
+let double(x) = x * 2;
+let nums_doubled = map(nums, double);
+let sum_doubled = fold(nums_doubled, sum, 0);
+print(sum_doubled);
+//-> 242
