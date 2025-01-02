@@ -1,0 +1,8 @@
+let add3(x) = (y) = {
+  print("Adding x (" + x + "), y (" + y + "), and a secret z!");
+  (z) = x + y + z
+};
+
+let plus_two = add3(2);
+print(plus_two(8)(32));
+//-> 42

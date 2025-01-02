@@ -73,40 +73,16 @@ impl Parser {
 
     fn parse_binding(&mut self, env: &mut Env) -> Parse<Binding> {
         let pattern = self.parse_pattern(env)?;
-        let name = pattern.0.name.clone();
 
         let is_func = self.matches(&TokenData::OpenParen);
 
         if is_func {
-            env.declare_local(name.clone());
-            let mut env = env.new_frame(name.clone());
-
-            let arguments = self.parse_arguments(
-                |parser, env| -> Parse<Pattern> {
-                    let pattern = parser.parse_pattern(env)?;
-                    env.declare_local(pattern.0.name.clone());
-                    Ok(pattern)
-                },
-                &mut env,
-            )?;
-
-            self.expect(TokenData::Equals)?;
-
-            let value = self.parse_expr(&mut env)?;
-            let upvalues = env.upvalues();
-
-            Ok(Binding {
-                pattern,
-                metadata: BindingMetadata::Func {
-                    arguments,
-                    upvalues,
-                },
-                value,
-            })
+            self.parse_func_binding(env, pattern)
         } else {
             self.expect(TokenData::Equals)?;
 
             // Insert the var *after* parsing value so that shadowing works
+            let name = pattern.0.name.clone();
             let value = self.parse_expr(env).inspect(|_| env.declare_local(name))?;
 
             Ok(Binding {
@@ -115,6 +91,53 @@ impl Parser {
                 value,
             })
         }
+    }
+
+    fn parse_anon_closure(&mut self, env: &mut Env) -> Parse<Expr> {
+        let mut env = env.create_scope();
+
+        // TODO: better name, maybe based on pos?
+        let mut func_indent = Identifier::new("anon_fn".to_string());
+
+        let func = self.parse_func_binding(&mut env, Pattern(func_indent.clone()))?;
+        let func = Stmt::Let(func);
+
+        func_indent.location = Some(env.resolve(&func_indent.name).unwrap());
+        let func_ref = Box::new(Expr::Identifier(func_indent));
+
+        Ok(Expr::Block(Block {
+            stmts: vec![func],
+            return_expr: Some(func_ref),
+        }))
+    }
+
+    fn parse_func_binding(&mut self, env: &mut Env, pattern: Pattern) -> Parse<Binding> {
+        let name = pattern.0.name.clone();
+        env.declare_local(name.clone());
+        let mut env = env.new_frame(name.clone());
+
+        let arguments = self.parse_arguments(
+            |parser, env| -> Parse<Pattern> {
+                let pattern = parser.parse_pattern(env)?;
+                env.declare_local(pattern.0.name.clone());
+                Ok(pattern)
+            },
+            &mut env,
+        )?;
+
+        self.expect(TokenData::Equals)?;
+
+        let value = self.parse_expr(&mut env)?;
+        let upvalues = env.upvalues();
+
+        Ok(Binding {
+            pattern,
+            metadata: BindingMetadata::Func {
+                arguments,
+                upvalues,
+            },
+            value,
+        })
     }
 
     fn parse_pattern(&mut self, env: &mut Env) -> Parse<Pattern> {
@@ -267,6 +290,9 @@ impl Parser {
         } else if self.matches(&TokenData::If) {
             let if_expr = self.parse_if_expr(env)?;
             Ok(Expr::If(Box::new(if_expr)))
+        } else if self.matches(&TokenData::OpenParen) {
+            let closure = self.parse_anon_closure(env)?;
+            Ok(closure)
         } else {
             self.consume_map(
                 |t| {

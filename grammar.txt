@@ -14,8 +14,11 @@ expression     -> logic_or
 
 block          -> "{" statement* expression? "}"
                 | if_expr
+                | closure
 
 if_expr        -> "if" expression block ( "else" (if_expr | block) )?
+
+closure        -> binding_args? "=" expression
 
 logic_or       -> ( logic_or "or" )? logic_and
 logic_and      -> ( logic_and "and" )? equality
