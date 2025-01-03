@@ -66,8 +66,24 @@ pub fn define_stdlib(env: &mut super::Env) {
 
 fn print(arguments: Vec<Value>) -> super::Result<Value> {
     for arg in arguments {
-        println!("{arg:#?}");
+        match arg {
+            Value::Bool(bool) => print!("{bool}"),
+            Value::Num(num) => print!("{num}"),
+            Value::Str(str) => print!("{str}"),
+            Value::Func(f) => match f {
+                Func::User(user_func) => print!("<fn {}>", user_func.name),
+                Func::Native(native_func) => print!("<native fn {:?}>", native_func),
+            },
+            Value::List(vec) => print!("{vec:?}"),
+            Value::Nil => print!("nil"),
+            Value::TailCall => {
+                print!("<tail call marker>");
+                unreachable!("tail call marker should never be assigned to anything");
+            }
+        };
+        print!(" ");
     }
+    println!();
     Ok(Value::Nil)
 }
 
