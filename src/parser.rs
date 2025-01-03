@@ -135,9 +135,18 @@ impl Parser {
     ) -> Parse<Expr> {
         let mut lhs = parse_operand(self, env)?;
 
-        while let Some(op) = self.tokens.next_if_map(&parse_operator) {
+        while let Some((op, op_pos)) = self
+            .tokens
+            // preserve pos
+            .next_if_map(|t| parse_operator(t).map(|op| (op, t.pos)))
+        {
             let rhs = parse_operand(self, env)?;
-            lhs = Expr::Binary(Box::new(BinaryExpr { lhs, op, rhs }));
+            lhs = Expr::Binary(Box::new(BinaryExpr {
+                lhs,
+                op,
+                rhs,
+                op_pos,
+            }));
         }
 
         Ok(lhs)

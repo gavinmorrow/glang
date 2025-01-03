@@ -55,6 +55,7 @@ impl Evaluate for Binding {
                     .collect();
                 let body = self.value.clone();
                 Value::Func(Func::User(UserFunc {
+                    name: self.pattern.0.name.clone(),
                     arguments,
                     upvalues,
                     body,
@@ -209,13 +210,15 @@ impl Evaluate for BinaryExpr {
                     return Err(Error::new(ErrorKind::TypeError {
                         expected: DiagnosticType::Num,
                         actual: b.into(),
-                    }))
+                    })
+                    .pos(self.op_pos))
                 }
                 (a, _) => {
                     return Err(Error::new(ErrorKind::TypeError {
                         expected: DiagnosticType::Num,
                         actual: a.into(),
-                    }))
+                    })
+                    .pos(self.op_pos))
                 }
             },
             BinaryOp::Divide => Num(lhs.as_num()? / rhs()?.as_num()?),
@@ -327,6 +330,7 @@ pub enum Func {
 
 #[derive(Clone, Debug)]
 pub struct UserFunc {
+    name: String,
     arguments: Vec<Pattern>,
     upvalues: Vec<Value>,
     body: Expr,
@@ -336,11 +340,10 @@ pub trait NativeFunc: std::fmt::Debug {
     fn call(&self, arguments: Vec<Value>) -> Result<Value>;
 }
 
-#[expect(dead_code, reason = "Pretty error printing not implemented yet")]
 #[derive(Debug)]
 pub struct Error {
-    kind: ErrorKind,
-    pos: Option<Pos>,
+    pub kind: ErrorKind,
+    pub pos: Option<Pos>,
 }
 
 impl Error {

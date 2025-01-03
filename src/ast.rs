@@ -74,6 +74,8 @@ pub struct BinaryExpr {
     pub lhs: Expr,
     pub op: BinaryOp,
     pub rhs: Expr,
+
+    pub op_pos: Pos,
 }
 #[derive(Clone, Debug)]
 pub enum BinaryOp {
