@@ -20,3 +20,21 @@ let a_plus = a("add");
 let c = a_plus(b);
 print("(" + c("x") + ", " + c("y") + ")");
 //-> (28, 50)
+
+
+
+let num(x) = {
+  let self(method) = {
+    if method == "get" { x }
+    else if method == "add" {
+      let add(other) = num(x + other("get"));
+      add
+    }
+  };
+  self
+};
+
+let two = num(2);
+let four = two("add")(two);
+print(four("get"));
+// -> 4
