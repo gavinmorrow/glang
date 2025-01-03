@@ -81,6 +81,9 @@ let list(first) = {
         list(first)
       };
       push
+    } else if method == "len" {
+      let add_one(a) = a + 1;
+      self("fold")(add_one, 0)
     }
   };
 
@@ -111,3 +114,6 @@ print("set nums[3] (6)", nums("get")(3)("value"));
 // -> 6
 print("modified sum (27)", nums("fold")(sum, 0));
 //-> 27
+
+print("len (5)", nums("len"));
+//-> 5
