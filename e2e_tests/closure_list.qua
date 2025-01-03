@@ -1,0 +1,98 @@
+let node(value, next) = {
+  let self(method) = {
+    if method == "value" {
+      value
+    } else if method == "next" {
+      next
+    } else if method == "push" {
+      let push(next) = node(value, next);
+      push
+    }
+  };
+  self
+};
+
+let list(first) = {
+  let start = node(nil, first);
+
+  let self(method) = {
+    if method == "get" {
+      let get(i) = {
+        // Account for start node
+        let i = i + 1;
+
+        let from(node, remaining) = {
+          if remaining == 0 {
+            node
+          } else if node == nil {
+            nil
+          } else {
+            from(node("next"), remaining - 1)
+          }
+        };
+        from(start, i)
+      };
+      get
+    } else if method == "fold" {
+      let fold(fn, initial_value) = {
+        let crawl(acc, i) = {
+          let elem = self("get")(i);
+          if elem == nil {
+            acc
+          } else {
+            let acc = fn(acc, elem("value"), i, list);
+            crawl(acc, i + 1)
+          }
+        };
+        crawl(initial_value, 0)
+      };
+      fold
+    } else if method == "map" {
+      let map(fn) = {
+        let map(acc, elem, i, l) = {
+          let elem = fn(elem, i, l);
+          acc("push")(elem)
+        };
+        self("fold")(map, list(nil));
+      };
+      map
+    } else if method == "set" {
+      let set(i, value) = {
+        let set_one(n, ni) = {
+          if i == ni { value }
+          else { n }
+        };
+        self("map")(set_one)
+      };
+      set
+    } else if method == "push" {
+      let push(value) = {
+        let push(cur) = {
+          let next = cur("next");
+          if next == nil {
+            cur("push")(value)
+          } else {
+            let next = push(next);
+            cur("push")(next)
+          }
+        };
+        let start = push(start);
+        let first = start("next");
+        list(first)
+      };
+      push
+    }
+  };
+
+  self
+};
+
+print(node(2, nil)("push")(node(42, nil))("next")("value"));
+//-> 42
+
+let primes = list(node(2, node(3, node(5, node(7, nil)))));
+let primes = primes("push")(node(11, nil));
+
+let sum(a, b) = a + b;
+print(primes("fold")(sum, 0));
+//-> 28
