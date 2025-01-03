@@ -4,9 +4,12 @@ mod stdlib;
 pub use env::Env;
 pub use stdlib::stub_stdlib;
 
-use crate::ast::{
-    BinaryExpr, BinaryOp, Binding, BindingMetadata, Block, Call, ElseBlock, Expr, Identifier,
-    IfExpr, Literal, Pattern, Program, Stmt, UnaryExpr, UnaryOp,
+use crate::{
+    ast::{
+        BinaryExpr, BinaryOp, Binding, BindingMetadata, Block, Call, ElseBlock, Expr, Identifier,
+        IfExpr, Literal, Pattern, Program, Stmt, UnaryExpr, UnaryOp,
+    },
+    lexer::Pos,
 };
 
 pub fn interpert(program: Program, env: &mut Env) -> Result<Value> {
@@ -100,18 +103,18 @@ impl Evaluate for Call {
             return Err(Error::new(ErrorKind::TypeError {
                 expected: DiagnosticType::Func,
                 actual: func.into(),
-            }));
+            })
+            .pos(self.pos));
         };
 
         if let Func::User(func) = func.clone() {
             let incorrect_arity = func.arguments.len() > self.arguments.len();
             if incorrect_arity {
-                return Err(Error {
-                    kind: ErrorKind::IncorrectArity {
-                        given: self.arguments.len(),
-                        correct: func.arguments.len(),
-                    },
-                });
+                return Err(Error::new(ErrorKind::IncorrectArity {
+                    given: self.arguments.len(),
+                    correct: func.arguments.len(),
+                })
+                .pos(self.pos));
             }
         }
 
@@ -337,11 +340,17 @@ pub trait NativeFunc: std::fmt::Debug {
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
+    pos: Option<Pos>,
 }
 
 impl Error {
     pub fn new(kind: ErrorKind) -> Self {
-        Self { kind }
+        Self { kind, pos: None }
+    }
+
+    pub fn pos(mut self, pos: Pos) -> Self {
+        self.pos = Some(pos);
+        self
     }
 }
 

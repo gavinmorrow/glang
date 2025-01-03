@@ -1,3 +1,5 @@
+use crate::lexer::Pos;
+
 pub type Program = Vec<Stmt>;
 
 #[derive(Clone, Debug)]
@@ -52,6 +54,7 @@ pub struct Call {
     pub target: Box<Expr>,
     pub arguments: Vec<Expr>,
     pub is_tail_call: bool,
+    pub pos: Pos,
 }
 
 #[derive(Clone, Debug)]

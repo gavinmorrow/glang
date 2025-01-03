@@ -209,12 +209,16 @@ impl Parser {
     fn parse_call(&mut self, env: &mut Env) -> Parse<Expr> {
         let mut target = self.parse_primary(env)?;
 
-        while self.matches(&TokenData::OpenParen) {
+        while let Some(token) = self
+            .tokens
+            .next_if(|t| matches!(t.data, TokenData::OpenParen))
+        {
             let arguments = self.parse_arguments(Self::parse_expr, env)?;
             target = Expr::Call(Call {
                 target: Box::new(target),
                 arguments,
                 is_tail_call: false,
+                pos: token.pos,
             });
         }
 
