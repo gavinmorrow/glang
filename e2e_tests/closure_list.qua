@@ -51,9 +51,9 @@ let list(first) = {
       let map(fn) = {
         let map(acc, elem, i, l) = {
           let elem = fn(elem, i, l);
-          acc("push")(elem)
+          acc("push")(node(elem, nil))
         };
-        self("fold")(map, list(nil));
+        self("fold")(map, list(nil))
       };
       map
     } else if method == "set" {
@@ -87,12 +87,27 @@ let list(first) = {
   self
 };
 
-print(node(2, nil)("push")(node(42, nil))("next")("value"));
+print("pushing 42 (42)", node(2, nil)("push")(node(42, nil))("next")("value"));
 //-> 42
 
 let primes = list(node(2, node(3, node(5, node(7, nil)))));
 let primes = primes("push")(node(11, nil));
 
 let sum(a, b) = a + b;
-print(primes("fold")(sum, 0));
+print("sum of primes (28)", primes("fold")(sum, 0));
 //-> 28
+
+let double(x) = x * 2;
+let doubled = primes("map")(double);
+print("sum doubled (56)", doubled("fold")(sum, 0));
+//-> 56
+
+let rest = primes("get")(4);
+print("fourth prime (11)", rest("value"));
+//-> 11
+
+let nums = primes("set")(3, 6);
+print("set nums[3] (6)", nums("get")(3)("value"));
+// -> 6
+print("modified sum (27)", nums("fold")(sum, 0));
+//-> 27
