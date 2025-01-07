@@ -1,0 +1,7 @@
+let a = "outer";
+let a() = {
+  let a() = "inner!";
+  a()
+};
+print(a());
+//-> inner

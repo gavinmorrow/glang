@@ -1,0 +1,11 @@
+let count_down_from(x) = if x > 0 {
+  // don't print much to keep the output file size down.
+  print(".");
+  count_down_from(x - 1)
+} else {
+  print("!");
+};
+
+// should not crash
+// number chosen by trying to get a c program to overflow stack
+count_down_from(300000);
