@@ -1,0 +1,6 @@
+let fib(x) = {
+  (x, acc) = if x <= 1 { acc } else { self(x - 1, acc * x) }
+}(x, 1);
+
+print(fib(10));
+//-> 3628800

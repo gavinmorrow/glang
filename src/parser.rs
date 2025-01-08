@@ -97,7 +97,7 @@ impl Parser {
         let mut env = env.create_scope();
 
         // TODO: better name, maybe based on pos?
-        let mut func_indent = Identifier::new("anon_fn".to_string());
+        let mut func_indent = Identifier::new("self".to_string());
 
         let func = self.parse_func_binding(&mut env, Pattern(func_indent.clone()))?;
         let func = Stmt::Let(func);
