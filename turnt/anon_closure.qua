@@ -1,8 +1,8 @@
-let add3(x) = (y) = {
+let fancy(x) = (y) = {
   print("Adding x (" + x + "), y (" + y + "), and a secret z!");
-  (z) = x + y + z
+  (w, z) = x + y + { w * z }
 };
 
-let plus_two = add3(2);
-print(plus_two(8)(32));
+let plus_two = fancy(2);
+print(plus_two(8)(16, 2));
 //-> 42
