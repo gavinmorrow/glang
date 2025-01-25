@@ -8,8 +8,8 @@ use wasm_encoder::{
 
 use crate::{
     ast::{
-        BinaryExpr, Binding, Block, Call, Expr, Identifier, IfExpr, Literal, Program, Stmt,
-        UnaryExpr,
+        BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Literal,
+        Program, Stmt, UnaryExpr,
     },
     interperter::Func,
 };
@@ -109,7 +109,15 @@ impl WasmGen {
 
     fn gen_expr(&mut self, func: &mut wasm_encoder::Function, expr: &Expr) {
         match expr {
-            Expr::Block(block) => todo!(),
+            Expr::Block(block) => {
+                for stmt in &block.stmts {
+                    self.gen_stmt(func, stmt);
+                }
+
+                if let Some(expr) = &block.return_expr {
+                    self.gen_expr(func, expr);
+                }
+            }
             Expr::Call(call) => {
                 // Put args on the stack
                 for arg in &call.arguments {
@@ -120,11 +128,35 @@ impl WasmGen {
                 // self.gen_expr(func, &call.target);
                 func.instruction(&wasm_encoder::Instruction::Call(0));
             }
-            Expr::If(if_expr) => todo!(),
-            Expr::Binary(binary_expr) => todo!(),
+            Expr::If(if_expr) => self.gen_if(func, if_expr),
+            Expr::Binary(binary_expr) => {
+                // Put lhs, then rhs on stack
+                self.gen_expr(func, &binary_expr.lhs);
+                self.gen_expr(func, &binary_expr.rhs);
+
+                use wasm_encoder::Instruction::{F64Add, F64Div, F64Mul, F64Sub};
+                let opcode = match binary_expr.op {
+                    BinaryOp::Or => todo!(),
+                    BinaryOp::And => todo!(),
+                    BinaryOp::NotEq => todo!(),
+                    BinaryOp::Eq => todo!(),
+                    BinaryOp::Greater => todo!(),
+                    BinaryOp::GreaterEq => todo!(),
+                    BinaryOp::Less => todo!(),
+                    BinaryOp::LessEq => todo!(),
+                    BinaryOp::Subtract => F64Sub,
+                    BinaryOp::Add => F64Add,
+                    BinaryOp::Divide => F64Div,
+                    BinaryOp::Multiply => F64Mul,
+                };
+                func.instruction(&opcode);
+            }
             Expr::Unary(unary_expr) => todo!(),
             Expr::Literal(literal) => match literal {
-                Literal::Bool(_) => todo!(),
+                Literal::Bool(b) => {
+                    let int_val = if *b { 1 } else { 0 };
+                    func.instruction(&wasm_encoder::Instruction::I32Const(int_val));
+                }
                 Literal::Number(n) => {
                     func.instruction(&wasm_encoder::Instruction::F64Const(*n));
                 }
@@ -133,5 +165,37 @@ impl WasmGen {
             },
             Expr::Identifier(identifier) => todo!(),
         }
+    }
+
+    fn gen_if(&mut self, func: &mut Function, if_expr: &IfExpr) {
+        // Condition
+        self.gen_expr(func, &if_expr.condition);
+
+        // if instruction
+        // FIXME: put actual type or smth
+        func.instruction(&wasm_encoder::Instruction::If(
+            wasm_encoder::BlockType::Result(ValType::F64),
+        ));
+
+        // then block
+        let then_expr = Expr::Block(if_expr.then_block.clone());
+        self.gen_expr(func, &then_expr);
+
+        // else block
+        if let Some(else_block) = &if_expr.else_block {
+            func.instruction(&wasm_encoder::Instruction::Else);
+
+            match else_block {
+                ElseBlock::ElseIf(if_expr) => {
+                    self.gen_if(func, if_expr);
+                }
+                ElseBlock::Else(block) => {
+                    let else_expr = Expr::Block(block.clone());
+                    self.gen_expr(func, &else_expr);
+                }
+            }
+        }
+
+        func.instruction(&wasm_encoder::Instruction::End);
     }
 }
