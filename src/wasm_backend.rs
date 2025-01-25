@@ -1,7 +1,7 @@
 use wasm_encoder::{
-    CodeSection, DataCountSection, DataSection, ElementSection, ElementSegment, ExportSection,
-    Function, FunctionSection, GlobalSection, ImportSection, MemorySection, Module, StartSection,
-    TableSection, TypeSection,
+    CodeSection, DataCountSection, DataSection, ElementSection, ElementSegment, EntityType,
+    ExportSection, Function, FunctionSection, GlobalSection, ImportSection, MemorySection, Module,
+    StartSection, TableSection, TypeSection, ValType,
 };
 
 use crate::{
@@ -77,13 +77,21 @@ impl WasmGen {
     }
 
     fn gen(&mut self) {
+        // Set up imports
+        self.type_section.ty().function([ValType::I32], []);
+        self.import_section
+            .import("std", "print", EntityType::Function(0));
+
         // Set up main function
         self.type_section.ty().function([], []);
-        self.function_section.function(0);
+        self.function_section.function(1);
+        self.start_section.function_index = 1;
 
         let locals = [];
 
         let mut main = Function::new(locals);
+        main.instruction(&wasm_encoder::Instruction::I32Const(42));
+        main.instruction(&wasm_encoder::Instruction::Call(0));
         main.instruction(&wasm_encoder::Instruction::End);
 
         self.code_section.function(&main);
@@ -92,7 +100,19 @@ impl WasmGen {
     fn gen_stmt(&mut self, func: &mut wasm_encoder::Function, stmt: &Stmt) {
         match stmt {
             Stmt::Let(binding) => todo!(),
-            Stmt::Expr(expr) => todo!(),
+            Stmt::Expr(expr) => self.gen_expr(func, expr),
+        }
+    }
+
+    fn gen_expr(&mut self, func: &mut wasm_encoder::Function, expr: &Expr) {
+        match expr {
+            Expr::Block(block) => todo!(),
+            Expr::Call(call) => todo!(),
+            Expr::If(if_expr) => todo!(),
+            Expr::Binary(binary_expr) => todo!(),
+            Expr::Unary(unary_expr) => todo!(),
+            Expr::Literal(literal) => todo!(),
+            Expr::Identifier(identifier) => todo!(),
         }
     }
 }
