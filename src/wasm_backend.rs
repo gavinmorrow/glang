@@ -1,3 +1,5 @@
+#![expect(unused)]
+
 use wasm_encoder::{
     CodeSection, DataCountSection, DataSection, ElementSection, ElementSegment, EntityType,
     ExportSection, Function, FunctionSection, GlobalSection, ImportSection, MemorySection, Module,
@@ -78,7 +80,7 @@ impl WasmGen {
 
     fn gen(&mut self) {
         // Set up imports
-        self.type_section.ty().function([ValType::I32], []);
+        self.type_section.ty().function([ValType::F64], []);
         self.import_section
             .import("std", "print", EntityType::Function(0));
 
@@ -90,8 +92,9 @@ impl WasmGen {
         let locals = [];
 
         let mut main = Function::new(locals);
-        main.instruction(&wasm_encoder::Instruction::I32Const(42));
-        main.instruction(&wasm_encoder::Instruction::Call(0));
+        for stmt in self.program.clone() {
+            self.gen_stmt(&mut main, &stmt);
+        }
         main.instruction(&wasm_encoder::Instruction::End);
 
         self.code_section.function(&main);
@@ -107,11 +110,27 @@ impl WasmGen {
     fn gen_expr(&mut self, func: &mut wasm_encoder::Function, expr: &Expr) {
         match expr {
             Expr::Block(block) => todo!(),
-            Expr::Call(call) => todo!(),
+            Expr::Call(call) => {
+                // Put args on the stack
+                for arg in &call.arguments {
+                    self.gen_expr(func, arg);
+                }
+
+                // Get target onto the stack
+                // self.gen_expr(func, &call.target);
+                func.instruction(&wasm_encoder::Instruction::Call(0));
+            }
             Expr::If(if_expr) => todo!(),
             Expr::Binary(binary_expr) => todo!(),
             Expr::Unary(unary_expr) => todo!(),
-            Expr::Literal(literal) => todo!(),
+            Expr::Literal(literal) => match literal {
+                Literal::Bool(_) => todo!(),
+                Literal::Number(n) => {
+                    func.instruction(&wasm_encoder::Instruction::F64Const(*n));
+                }
+                Literal::Str(_) => todo!(),
+                Literal::Nil => todo!(),
+            },
             Expr::Identifier(identifier) => todo!(),
         }
     }
