@@ -9,7 +9,7 @@ use wasm_encoder::{
 use crate::{
     ast::{
         BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Literal,
-        Program, Stmt, UnaryExpr,
+        Program, Stmt, UnaryExpr, UnaryOp,
     },
     interperter::Func,
 };
@@ -134,16 +134,19 @@ impl WasmGen {
                 self.gen_expr(func, &binary_expr.lhs);
                 self.gen_expr(func, &binary_expr.rhs);
 
-                use wasm_encoder::Instruction::{F64Add, F64Div, F64Mul, F64Sub};
+                use wasm_encoder::Instruction::{
+                    F64Add, F64Div, F64Eq, F64Ge, F64Gt, F64Le, F64Lt, F64Mul, F64Ne, F64Sub,
+                    I32And, I32Or,
+                };
                 let opcode = match binary_expr.op {
-                    BinaryOp::Or => todo!(),
-                    BinaryOp::And => todo!(),
-                    BinaryOp::NotEq => todo!(),
-                    BinaryOp::Eq => todo!(),
-                    BinaryOp::Greater => todo!(),
-                    BinaryOp::GreaterEq => todo!(),
-                    BinaryOp::Less => todo!(),
-                    BinaryOp::LessEq => todo!(),
+                    BinaryOp::Or => I32And,
+                    BinaryOp::And => I32Or,
+                    BinaryOp::NotEq => F64Ne,
+                    BinaryOp::Eq => F64Eq,
+                    BinaryOp::Greater => F64Gt,
+                    BinaryOp::GreaterEq => F64Ge,
+                    BinaryOp::Less => F64Lt,
+                    BinaryOp::LessEq => F64Le,
                     BinaryOp::Subtract => F64Sub,
                     BinaryOp::Add => F64Add,
                     BinaryOp::Divide => F64Div,
@@ -151,7 +154,21 @@ impl WasmGen {
                 };
                 func.instruction(&opcode);
             }
-            Expr::Unary(unary_expr) => todo!(),
+            Expr::Unary(unary_expr) => {
+                self.gen_expr(func, &unary_expr.rhs);
+
+                let op = match unary_expr.op {
+                    UnaryOp::Not => {
+                        // Use XOR 1 as not
+                        // 0 xor 1 -> 1
+                        // 1 xor 1 -> 0
+                        func.instruction(&wasm_encoder::Instruction::I32Const(1));
+                        wasm_encoder::Instruction::I32Xor
+                    }
+                    UnaryOp::Negate => wasm_encoder::Instruction::F64Neg,
+                };
+                func.instruction(&op);
+            }
             Expr::Literal(literal) => match literal {
                 Literal::Bool(b) => {
                     let int_val = if *b { 1 } else { 0 };
