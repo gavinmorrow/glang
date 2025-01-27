@@ -1,5 +1,7 @@
 #![expect(unused)]
 
+use std::collections::HashMap;
+
 use wasm_encoder::{
     self as wasm, CodeSection, DataCountSection, DataSection, ElementSection, ElementSegment,
     EntityType, ExportSection, Function, FunctionSection, GlobalSection, ImportSection,
@@ -8,8 +10,8 @@ use wasm_encoder::{
 
 use crate::{
     ast::{
-        BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, Identifier, IfExpr, Literal,
-        Program, Stmt, UnaryExpr, UnaryOp,
+        BinaryExpr, BinaryOp, Binding, Block, Call, ElseBlock, Expr, IdentLocation, Identifier,
+        IfExpr, Literal, Program, Stmt, UnaryExpr, UnaryOp, UpvalueIndex,
     },
     interperter::Func,
 };
@@ -52,26 +54,32 @@ pub fn gen_wasm(program: &Program) -> Module {
 }
 
 struct WasmFunc<'i> {
-    locals: Vec<ValType>,
+    locals: HashMap<IdentLocation, (LocalIdx, ValType)>,
     instructions: Vec<wasm::Instruction<'i>>,
 }
 
 impl<'i> WasmFunc<'i> {
     fn new() -> Self {
         WasmFunc {
-            locals: Vec::new(),
+            locals: HashMap::new(),
             instructions: Vec::new(),
         }
     }
 
-    fn local(&mut self, r#type: ValType, value: &Expr) -> LocalIdx {
-        let idx = self.locals.len() as u32;
-        self.locals.push(r#type);
+    fn load_local(&mut self, ident_location: &IdentLocation) {
+        let (idx, _) = self
+            .locals
+            .get(ident_location)
+            .expect("local should be set before being loaded");
+
+        self.instruction(wasm::Instruction::LocalGet(idx.0));
+    }
+    fn store_local(&mut self, ty: ValType, ident_location: IdentLocation, value: &Expr) {
+        let local_idx = LocalIdx(self.locals.len() as u32);
+        self.locals.insert(ident_location, (local_idx, ty));
 
         gen_expr(self, value);
-        self.instruction(wasm::Instruction::LocalSet(idx));
-
-        LocalIdx(idx)
+        self.instruction(wasm::Instruction::LocalSet(local_idx.0));
     }
 
     fn instruction(&mut self, instruction: wasm::Instruction<'i>) -> &mut Self {
@@ -80,7 +88,9 @@ impl<'i> WasmFunc<'i> {
     }
 
     fn gen(self) -> wasm::Function {
-        let locals = self.locals;
+        let mut locals = self.locals.values().collect::<Vec<_>>();
+        locals.sort_by_key(|(idx, _)| idx);
+        let locals = locals.iter().map(|(_, ty)| *ty);
 
         let mut main = wasm::Function::new_with_locals_types(locals);
         for instruction in &self.instructions {
@@ -91,12 +101,19 @@ impl<'i> WasmFunc<'i> {
     }
 }
 
+#[derive(Copy, Clone, Eq, Ord, PartialEq, PartialOrd)]
 struct LocalIdx(u32);
 
 fn gen_stmt(func: &mut WasmFunc, stmt: &Stmt) {
     match stmt {
         Stmt::Let(binding) => {
-            func.local(ValType::F64, &binding.value);
+            let ty = ValType::F64;
+            let ident_location = binding
+                .pattern
+                .0
+                .location
+                .expect("ident locations should be resolved");
+            func.store_local(ty, ident_location, &binding.value);
         }
         Stmt::Expr(expr) => gen_expr(func, expr),
     }
@@ -175,7 +192,13 @@ fn gen_expr(func: &mut WasmFunc, expr: &Expr) {
             Literal::Str(_) => todo!(),
             Literal::Nil => todo!(),
         },
-        Expr::Identifier(identifier) => todo!(),
+        Expr::Identifier(identifier) => {
+            func.load_local(
+                &identifier
+                    .location
+                    .expect("ident location shold be resolved"),
+            );
+        }
     }
 }
 

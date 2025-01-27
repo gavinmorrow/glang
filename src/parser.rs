@@ -85,6 +85,12 @@ impl Parser {
             let name = pattern.0.name.clone();
             let value = self.parse_expr(env).inspect(|_| env.declare_local(name))?;
 
+            let mut pattern = pattern;
+            pattern.0.location = Some(
+                env.resolve(&pattern.0.name)
+                    .expect("just-defined local should exist in env"),
+            );
+
             Ok(Binding {
                 pattern,
                 metadata: BindingMetadata::Var,
