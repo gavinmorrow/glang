@@ -31,7 +31,7 @@ fn main() {
                 Ok(ast) => ast,
                 Err(err) => return eprintln!("Error parsing AST: {err:#?}"),
             };
-            let wasm = gen_wasm(ast);
+            let wasm = gen_wasm(&ast);
 
             let path = Path::new(&path);
             let Some(std::path::Component::Normal(filename)) = path.components().last() else {
