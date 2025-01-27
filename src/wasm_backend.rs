@@ -74,6 +74,7 @@ impl<'i> WasmFunc<'i> {
 
         self.instruction(wasm::Instruction::LocalGet(idx.0));
     }
+
     fn store_local(&mut self, ty: ValType, ident_location: IdentLocation, value: &Expr) {
         let local_idx = LocalIdx(self.locals.len() as u32);
         self.locals.insert(ident_location, (local_idx, ty));
