@@ -1,7 +1,5 @@
 #![expect(unused)]
 
-mod collect_locals;
-
 use wasm_encoder::{
     self as wasm, CodeSection, DataCountSection, DataSection, ElementSection, ElementSegment,
     EntityType, ExportSection, Function, FunctionSection, GlobalSection, ImportSection,
@@ -54,7 +52,7 @@ pub fn gen_wasm(program: &Program) -> Module {
 }
 
 struct WasmFunc<'i> {
-    locals: Vec<()>,
+    locals: Vec<ValType>,
     instructions: Vec<wasm::Instruction<'i>>,
 }
 
@@ -66,13 +64,23 @@ impl<'i> WasmFunc<'i> {
         }
     }
 
+    fn local(&mut self, r#type: ValType, value: &Expr) -> LocalIdx {
+        let idx = self.locals.len() as u32;
+        self.locals.push(r#type);
+
+        gen_expr(self, value);
+        self.instruction(wasm::Instruction::LocalSet(idx));
+
+        LocalIdx(idx)
+    }
+
     fn instruction(&mut self, instruction: wasm::Instruction<'i>) -> &mut Self {
         self.instructions.push(instruction);
         self
     }
 
     fn gen(self) -> wasm::Function {
-        let locals = self.locals.iter().map(|()| ValType::F64);
+        let locals = self.locals;
 
         let mut main = wasm::Function::new_with_locals_types(locals);
         for instruction in &self.instructions {
@@ -83,9 +91,13 @@ impl<'i> WasmFunc<'i> {
     }
 }
 
+struct LocalIdx(u32);
+
 fn gen_stmt(func: &mut WasmFunc, stmt: &Stmt) {
     match stmt {
-        Stmt::Let(binding) => todo!(),
+        Stmt::Let(binding) => {
+            func.local(ValType::F64, &binding.value);
+        }
         Stmt::Expr(expr) => gen_expr(func, expr),
     }
 }
