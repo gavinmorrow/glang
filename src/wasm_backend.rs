@@ -1,5 +1,8 @@
 #![expect(unused)]
 
+mod collect_locals;
+
+use collect_locals::collect_locals;
 use wasm_encoder::{
     CodeSection, DataCountSection, DataSection, ElementSection, ElementSegment, EntityType,
     ExportSection, Function, FunctionSection, GlobalSection, ImportSection, MemorySection, Module,
@@ -56,7 +59,8 @@ impl WasmGen {
     }
 
     fn gen(mut self) -> Module {
-        let locals = [];
+        // TODO: when type info become available actually type locals
+        let locals = [(collect_locals(&self.program).len() as u32, ValType::F64)];
         let mut main = Function::new(locals);
 
         for stmt in self.program.clone() {
