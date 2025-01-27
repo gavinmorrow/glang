@@ -50,8 +50,8 @@ pub fn gen_wasm(program: &Program) -> Module {
         .section(&type_section)
         .section(&import_section)
         .section(&function_section)
-        .section(&code_section)
-        .section(&start_section);
+        .section(&start_section)
+        .section(&code_section);
     module
 }
 
