@@ -2,7 +2,6 @@
 
 mod collect_locals;
 
-use collect_locals::collect_locals;
 use wasm_encoder::{
     self as wasm, CodeSection, DataCountSection, DataSection, ElementSection, ElementSegment,
     EntityType, ExportSection, Function, FunctionSection, GlobalSection, ImportSection,
@@ -19,14 +18,13 @@ use crate::{
 
 pub fn gen_wasm(program: &Program) -> Module {
     // TODO: when type info become available actually type locals
-    let locals = [(collect_locals(program).len() as u32, ValType::F64)];
-    let mut main = Function::new(locals);
+    let mut main = WasmFunc::new();
 
     // Generate main func body
     for stmt in program {
         gen_stmt(&mut main, stmt);
     }
-    main.instruction(&wasm::Instruction::End);
+    main.instruction(wasm::Instruction::End);
 
     // Generate actual binary
     let mut type_section = TypeSection::new();
@@ -43,7 +41,7 @@ pub fn gen_wasm(program: &Program) -> Module {
     type_section.ty().function([], []);
     function_section.function(1);
     start_section.function_index = 1;
-    code_section.function(&main);
+    code_section.function(&main.gen());
 
     let mut module = Module::new();
     module
@@ -55,14 +53,44 @@ pub fn gen_wasm(program: &Program) -> Module {
     module
 }
 
-fn gen_stmt(func: &mut wasm::Function, stmt: &Stmt) {
+struct WasmFunc<'i> {
+    locals: Vec<()>,
+    instructions: Vec<wasm::Instruction<'i>>,
+}
+
+impl<'i> WasmFunc<'i> {
+    fn new() -> Self {
+        WasmFunc {
+            locals: Vec::new(),
+            instructions: Vec::new(),
+        }
+    }
+
+    fn instruction(&mut self, instruction: wasm::Instruction<'i>) -> &mut Self {
+        self.instructions.push(instruction);
+        self
+    }
+
+    fn gen(self) -> wasm::Function {
+        let locals = self.locals.iter().map(|()| ValType::F64);
+
+        let mut main = wasm::Function::new_with_locals_types(locals);
+        for instruction in &self.instructions {
+            main.instruction(instruction);
+        }
+
+        main
+    }
+}
+
+fn gen_stmt(func: &mut WasmFunc, stmt: &Stmt) {
     match stmt {
         Stmt::Let(binding) => todo!(),
         Stmt::Expr(expr) => gen_expr(func, expr),
     }
 }
 
-fn gen_expr(func: &mut wasm::Function, expr: &Expr) {
+fn gen_expr(func: &mut WasmFunc, expr: &Expr) {
     match expr {
         Expr::Block(block) => {
             for stmt in &block.stmts {
@@ -81,7 +109,7 @@ fn gen_expr(func: &mut wasm::Function, expr: &Expr) {
 
             // Get target onto the stack
             // gen_expr(func, &call.target);
-            func.instruction(&wasm::Instruction::Call(0));
+            func.instruction(wasm::Instruction::Call(0));
         }
         Expr::If(if_expr) => gen_if(func, if_expr),
         Expr::Binary(binary_expr) => {
@@ -107,7 +135,7 @@ fn gen_expr(func: &mut wasm::Function, expr: &Expr) {
                 BinaryOp::Divide => F64Div,
                 BinaryOp::Multiply => F64Mul,
             };
-            func.instruction(&opcode);
+            func.instruction(opcode);
         }
         Expr::Unary(unary_expr) => {
             gen_expr(func, &unary_expr.rhs);
@@ -117,20 +145,20 @@ fn gen_expr(func: &mut wasm::Function, expr: &Expr) {
                     // Use XOR 1 as not
                     // 0 xor 1 -> 1
                     // 1 xor 1 -> 0
-                    func.instruction(&wasm::Instruction::I32Const(1));
+                    func.instruction(wasm::Instruction::I32Const(1));
                     wasm::Instruction::I32Xor
                 }
                 UnaryOp::Negate => wasm::Instruction::F64Neg,
             };
-            func.instruction(&op);
+            func.instruction(op);
         }
         Expr::Literal(literal) => match literal {
             Literal::Bool(b) => {
                 let int_val = if *b { 1 } else { 0 };
-                func.instruction(&wasm::Instruction::I32Const(int_val));
+                func.instruction(wasm::Instruction::I32Const(int_val));
             }
             Literal::Number(n) => {
-                func.instruction(&wasm::Instruction::F64Const(*n));
+                func.instruction(wasm::Instruction::F64Const(*n));
             }
             Literal::Str(_) => todo!(),
             Literal::Nil => todo!(),
@@ -139,15 +167,13 @@ fn gen_expr(func: &mut wasm::Function, expr: &Expr) {
     }
 }
 
-fn gen_if(func: &mut Function, if_expr: &IfExpr) {
+fn gen_if(func: &mut WasmFunc, if_expr: &IfExpr) {
     // Condition
     gen_expr(func, &if_expr.condition);
 
     // if instruction
     // TODO: put actual type or smth
-    func.instruction(&wasm::Instruction::If(wasm::BlockType::Result(
-        ValType::F64,
-    )));
+    func.instruction(wasm::Instruction::If(wasm::BlockType::Result(ValType::F64)));
 
     // then block
     let then_expr = Expr::Block(if_expr.then_block.clone());
@@ -155,7 +181,7 @@ fn gen_if(func: &mut Function, if_expr: &IfExpr) {
 
     // else block
     if let Some(else_block) = &if_expr.else_block {
-        func.instruction(&wasm::Instruction::Else);
+        func.instruction(wasm::Instruction::Else);
 
         match else_block {
             ElseBlock::ElseIf(if_expr) => {
@@ -168,5 +194,5 @@ fn gen_if(func: &mut Function, if_expr: &IfExpr) {
         }
     }
 
-    func.instruction(&wasm::Instruction::End);
+    func.instruction(wasm::Instruction::End);
 }
