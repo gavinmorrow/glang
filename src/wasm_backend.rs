@@ -189,7 +189,7 @@ impl WasmGen {
         self.gen_expr(func, &if_expr.condition);
 
         // if instruction
-        // FIXME: put actual type or smth
+        // TODO: put actual type or smth
         func.instruction(&wasm_encoder::Instruction::If(
             wasm_encoder::BlockType::Result(ValType::F64),
         ));
